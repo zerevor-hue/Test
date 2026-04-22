@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>골프 예약 관리 시스템</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f0f0eb;
+  --surface: #fff;
+  --border: rgba(0,0,0,0.09);
+  --border-md: rgba(0,0,0,0.15);
+  --text: #1a1a1a;
+  --muted: #777;
+  --faint: #bbb;
+  --blue: #2563a8;
+  --green: #1a7a4a;
+  --r: 12px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --accent-screen: #2563a8;
+  --accent-park: #1a7a4a;
+}
+
+body {
+  font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 12px 10px 40px;
+  font-weight: 500;
+}
+
+/* ── 글로벌 탭 ── */
+.global-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  background: var(--surface);
+  border-radius: var(--r);
+  padding: 6px;
+  box-shadow: var(--shadow);
+  border: 0.5px solid var(--border);
+}
+.gtab {
+  flex: 1;
+  padding: 10px 8px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.gtab.active { background: #1a1a1a; color: #fff; }
+.gtab:hover:not(.active) { background: var(--bg); color: var(--text); }
+
+/* ── 페이지 패널 ── */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ══════════════════════════════
+   예약 현황 스타일
+══════════════════════════════ */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.page-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+#syncStatus { font-size: 11px; font-weight: 500; color: #aaa; margin-left: 8px; }
+
+.boards { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.board { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); border: 0.5px solid var(--border); flex: 1; min-width: 300px; overflow: visible; }
+.board.screen { background: #F5FAFF; }
+.board.park { background: #F4FCF7; }
+.board-header { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; border-bottom: 0.5px solid var(--border); flex-wrap: wrap; gap: 6px; }
+.board.screen .board-header { background: #F5FAFF; border-bottom-color: rgba(37,99,168,0.1); }
+.board.park .board-header { background: #F4FCF7; border-bottom-color: rgba(26,122,74,0.1); }
+.board-title { font-size: 13px; font-weight: 500; color: var(--text); }
+.board-title strong { font-size: 16px; font-weight: 700; }
+.board.screen .board-title { color: var(--accent-screen); }
+.board.park .board-title { color: var(--accent-park); }
+.header-controls { display: flex; align-items: center; gap: 6px; }
+.today-btn { font-size: 10px; font-weight: 800; color: #fff; background: var(--text); border: none; border-radius: 5px; padding: 5px 7px; cursor: pointer; letter-spacing: 0.4px; white-space: nowrap; touch-action: manipulation; }
+.today-btn:hover { background: #444; }
+.day-nav-btn { background: var(--bg); border: 0.5px solid var(--border-md); border-radius: 6px; padding: 4px 8px; font-size: 18px; font-weight: 700; color: var(--text); cursor: pointer; line-height: 1; touch-action: manipulation; }
+.day-nav-btn:hover { background: #e4e4de; }
+.date-btn { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700; color: var(--text); background: var(--bg); border: 0.5px solid var(--border-md); border-radius: 6px; padding: 5px 9px; cursor: pointer; touch-action: manipulation; }
+.date-btn:hover { background: #e4e4de; }
+.cal-popup { display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 500; background: var(--surface); border: 0.5px solid var(--border-md); border-radius: var(--r); padding: 12px; width: 230px; box-shadow: 0 6px 24px rgba(0,0,0,0.14); }
+.cal-popup.open { display: block; }
+.cal-nav-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.cal-nav-row span { font-size: 13px; font-weight: 700; }
+.cal-nav { background: none; border: none; cursor: pointer; font-size: 18px; color: var(--muted); padding: 0 4px; line-height: 1; touch-action: manipulation; font-weight: 700; }
+.cal-nav:hover { color: var(--text); }
+.cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 1px; }
+.cal-dow { font-size: 10px; font-weight: 700; text-align: center; padding: 3px 0; color: var(--muted); }
+.cal-dow.sun { color: #c0392b; } .cal-dow.sat { color: #2563a8; }
+.cal-day { font-size: 12px; font-weight: 600; text-align: center; padding: 5px 2px; border-radius: 4px; cursor: pointer; color: var(--text); touch-action: manipulation; }
+.cal-day:hover { background: var(--bg); }
+.cal-day.sun { color: #c0392b; } .cal-day.sat { color: #2563a8; }
+.cal-day.other { color: var(--faint); } .cal-day.today { font-weight: 800; }
+.cal-day.selected { background: #1a1a1a !important; color: #fff !important; }
+.cal-day.has-dot::after { content:''; display:block; width:3px; height:3px; border-radius:50%; background:#1a1a1a; margin:1px auto 0; }
+.cal-day.selected::after { background:#fff; }
+.table-wrap { overflow-x: auto; margin: 12px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.13); background: #fff; -webkit-overflow-scrolling: touch; }
+.board.screen .table-wrap { border-color: rgba(37,99,168,0.12); }
+.board.park .table-wrap { border-color: rgba(26,122,74,0.12); }
+table { border-collapse: collapse; width: 100%; font-size: 12px; min-width: 320px; table-layout: fixed; }
+th, td { border: 0.5px solid rgba(0,0,0,0.08); text-align: center; padding: 0; overflow: hidden; }
+table > thead > tr > th:first-child, table > tbody > tr > td:first-child { border-left: none; }
+table > thead > tr > th:last-child, table > tbody > tr > td:last-child { border-right: none; }
+thead > tr > th { border-top: none; }
+tbody > tr:last-child > td { border-bottom: none; }
+th.corner { width: 62px; background: #fff; position: sticky; left: 0; z-index: 4; border-left: none; border-top: none; }
+th.col-head { background: #fafafa; font-weight: 800; font-size: 13px; padding: 11px 4px; min-width: 86px; border-top: none; }
+.board.screen th.col-head { color: var(--accent-screen); }
+.board.park th.col-head { color: var(--accent-park); }
+td.time-label { background: #fafafa; color: #444; font-size: 11px; font-weight: 800; padding: 3px 12px; position: sticky; left: 0; z-index: 2; white-space: nowrap; }
+td.slot { height: 22px; cursor: pointer; vertical-align: top; background: #fff; transition: background 0.1s; position: relative; user-select: none; touch-action: none; overflow: visible; }
+td.slot.empty:hover { background: #f0f6ff; }
+td.slot.drag-over { background: #e8f4e8 !important; outline: 2px dashed #1a7a4a; outline-offset: -2px; }
+td.slot.drag-invalid { background: #fff0f0 !important; outline: 2px dashed #c0392b; outline-offset: -2px; }
+td.slot.select-preview { background: #dbeafe !important; outline: 2px dashed #2563a8; outline-offset: -2px; }
+td.slot.booked { cursor: grab; overflow: visible; }
+td.slot.booked:active { cursor: grabbing; }
+td.slot.dragging { opacity: 0.4; }
+.slot-content { position: absolute; top: 0; left: 0; right: 0; padding: 4px 4px; z-index: 3; pointer-events: none; text-align: center; overflow: hidden; border-radius: 3px; }
+.slot-time { font-size: 12px; font-weight: 700; display: block; line-height: 1.6; opacity: 0.9; white-space: nowrap; }
+.slot-main { font-size: 14px; font-weight: 800; display: block; line-height: 1.5; white-space: nowrap; }
+.slot-sub { font-size: 12px; font-weight: 700; display: block; opacity: 0.85; line-height: 1.5; white-space: nowrap; }
+.slot-memo { font-size: 11px; font-weight: 600; display: block; opacity: 0.75; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 예약 모달 */
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: center; justify-content: center; padding: 12px; }
+.modal-bg.open { display: flex; }
+.modal { background: #fff; border-radius: 14px; padding: 20px; width: 100%; max-width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); max-height: 90vh; overflow-y: auto; }
+.modal h3 { font-size: 15px; font-weight: 800; margin-bottom: 14px; color: var(--text); }
+.modal label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 4px; margin-top: 11px; }
+.modal input, .modal select, .modal textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--border-md); border-radius: 7px; font-size: 14px; color: var(--text); background: #fff; font-family: inherit; resize: none; -webkit-appearance: none; appearance: none; }
+.modal input:focus, .modal select:focus, .modal textarea:focus { outline: none; border-color: #666; }
+.time-row { display: flex; gap: 8px; align-items: flex-end; }
+.time-row > .ts { flex: 1; }
+.time-row .arrow { font-size: 15px; color: var(--muted); padding-bottom: 9px; flex-shrink: 0; }
+.err-box { font-size: 12px; color: #c0392b; background: #fff5f5; border: 1px solid #f5c6c6; border-radius: 6px; padding: 7px 10px; margin-top: 8px; display: none; }
+.modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+.mbtn { flex: 1; padding: 10px; border-radius: 8px; font-size: 14px; cursor: pointer; border: 1px solid var(--border-md); background: #fff; color: var(--text); font-family: inherit; font-weight: 700; touch-action: manipulation; }
+.mbtn:hover { background: var(--bg); }
+.mbtn.primary { background: #1a1a1a; border-color: #1a1a1a; color: #fff; }
+.mbtn.primary:hover { background: #333; }
+.mbtn.del { border-color: #e74c3c; color: #c0392b; }
+.mbtn.del:hover { background: #fff5f5; }
+.drag-ghost { position: fixed; pointer-events: none; z-index: 9999; background: rgba(255,255,255,0.95); border: 2px solid #333; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 600; color: #1a1a1a; box-shadow: 0 4px 16px rgba(0,0,0,0.2); white-space: nowrap; display: none; }
+
+/* ══════════════════════════════
+   회원 관리 스타일
+══════════════════════════════ */
+.card { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); border: 0.5px solid var(--border); padding: 16px; margin-bottom: 12px; }
+.search-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.search-bar input, .search-bar select { padding: 9px 12px; border: 0.5px solid var(--border-md); border-radius: 8px; font-size: 13px; font-weight: 600; font-family: inherit; color: var(--text); background: var(--surface); }
+.search-bar input { flex: 1; min-width: 140px; }
+.search-bar input:focus, .search-bar select:focus { outline: none; border-color: #666; }
+.btn { padding: 9px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; border: 0.5px solid var(--border-md); background: var(--surface); color: var(--text); font-family: inherit; white-space: nowrap; touch-action: manipulation; }
+.btn:hover { background: var(--bg); }
+.btn.primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.btn.primary:hover { background: #333; }
+.btn.blue { background: var(--blue); color: #fff; border-color: var(--blue); }
+.mtable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mtable th { background: #f7f7f4; padding: 10px; text-align: left; font-weight: 800; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.mtable td { padding: 11px 10px; border-bottom: 0.5px solid var(--border); vertical-align: middle; }
+.mtable tr:last-child td { border-bottom: none; }
+.mtable tr:hover td { background: #fafaf8; cursor: pointer; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.b-vip { background: #fff2cc; color: #7a5c00; }
+.b-good { background: #daeeff; color: #1a4a6e; }
+.b-normal { background: #f0f0eb; color: #777; }
+.b-screen { background: #daeeff; color: #1a4a6e; }
+.b-park { background: #c8edcc; color: #1a4d22; }
+.b-both { background: #e8e1f5; color: #4b2b6b; }
+.b-weekend { background: #fff2cc; color: #7a5c00; }
+.b-weekday { background: #f0f0eb; color: #555; }
+.b-time { background: #fce8d4; color: #7a4500; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.vdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+.dot-r { background: #1a7a4a; } .dot-m { background: #d6b656; } .dot-o { background: #e74c3c; }
+
+/* 회원 모달 */
+.mmodal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: center; justify-content: center; padding: 12px; }
+.mmodal-bg.open { display: flex; }
+.mmodal { background: var(--surface); border-radius: 14px; padding: 20px; width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+.mmodal h3 { font-size: 16px; font-weight: 800; margin-bottom: 16px; }
+.form-row { display: flex; gap: 10px; margin-bottom: 10px; }
+.fg { flex: 1; }
+.fg label { display: block; font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+.fg input, .fg select, .fg textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--border-md); border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text); background: var(--surface); font-family: inherit; resize: none; }
+.fg input:focus, .fg select:focus, .fg textarea:focus { outline: none; border-color: #666; }
+.mmodal-btns { display: flex; gap: 8px; margin-top: 16px; }
+.mmodal-btns .btn { flex: 1; padding: 11px; font-size: 14px; }
+.memo-item { padding: 8px 10px; background: #fafaf8; border-radius: 8px; margin-bottom: 6px; border: 0.5px solid var(--border); }
+.memo-date { font-size: 11px; color: var(--muted); font-weight: 700; margin-bottom: 3px; }
+.memo-text { font-size: 13px; font-weight: 600; }
+
+/* 분석 박스 */
+.analysis-box { background: #f7f7f4; border-radius: 10px; padding: 12px; margin-top: 10px; border: 0.5px solid var(--border); }
+.a-title { font-size: 11px; font-weight: 800; color: var(--muted); margin-bottom: 10px; }
+.a-section { font-size: 11px; font-weight: 800; color: var(--muted); margin: 10px 0 6px; }
+.a-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 12px; font-weight: 600; }
+.a-label { min-width: 90px; }
+.a-bar-wrap { flex: 1; background: #e4e4de; border-radius: 4px; height: 7px; }
+.a-bar { height: 7px; border-radius: 4px; }
+.bar-blue { background: var(--blue); } .bar-green { background: var(--green); } .bar-amber { background: #d6a820; }
+.a-count { min-width: 28px; text-align: right; color: var(--muted); }
+
+/* 툴팁 */
+.tooltip { position: fixed; z-index: 2000; background: #1a1a1a; color: #fff; border-radius: 10px; padding: 10px 14px; font-size: 12px; font-weight: 600; pointer-events: none; display: none; max-width: 240px; line-height: 1.8; box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+.t-name { font-size: 14px; font-weight: 800; margin-bottom: 4px; }
+
+/* 통계 */
+.stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px,1fr)); gap: 10px; margin-bottom: 14px; }
+.stat-card { background: var(--surface); border-radius: var(--r); border: 0.5px solid var(--border); padding: 14px; text-align: center; box-shadow: var(--shadow); }
+.stat-num { font-size: 28px; font-weight: 800; line-height: 1.2; }
+.stat-label { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 4px; }
+.rank-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rank-table th { background: #f7f7f4; padding: 9px 10px; text-align: left; font-weight: 800; color: var(--muted); border-bottom: 1px solid var(--border); }
+.rank-table td { padding: 10px; border-bottom: 0.5px solid var(--border); font-weight: 600; }
+.rank-table tr:last-child td { border-bottom: none; }
+.rn { font-size: 16px; font-weight: 800; color: var(--muted); width: 32px; }
+.r1 { color: #d4a017; } .r2 { color: #8a9099; } .r3 { color: #a0673c; }
+.bbar-wrap { background: #f0f0eb; border-radius: 4px; height: 7px; margin-top: 3px; }
+.bbar-fill { height: 7px; border-radius: 4px; background: var(--blue); }
+.bbar-fill.g { background: var(--green); }
+.date-range { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.date-range input[type="date"] { padding: 8px 10px; border: 0.5px solid var(--border-md); border-radius: 8px; font-size: 13px; font-weight: 600; font-family: inherit; color: var(--text); background: var(--surface); }
+.date-range input[type="date"]:focus { outline: none; border-color: #666; }
+.date-range span { font-size: 13px; font-weight: 700; color: var(--muted); }
+
+/* 로딩 오버레이 */
+#loadingOverlay { position: fixed; inset: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
+.spinner { width: 36px; height: 36px; border: 3px solid #ddd; border-top-color: #1a7a4a; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Mobile */
+@media (max-width: 640px) {
+  body { padding: 10px 6px 32px; }
+  .boards { gap: 10px; flex-direction: column; }
+  .board { min-width: 0; width: 100%; }
+  .table-wrap { margin: 6px; border-radius: 8px; }
+  th.col-head { min-width: 60px; font-size: 11px; padding: 8px 2px; }
+  td.time-label { font-size: 10px; padding: 3px 6px; }
+  td.slot { height: 20px; }
+  .slot-time, .slot-sub, .slot-memo { font-size: 10px; }
+  .slot-main { font-size: 11px; }
+  .board-header { padding: 8px 10px; }
+  .modal input, .modal select, .modal textarea { font-size: 16px; }
+  th.corner { width: 48px; }
+  .mtable th:nth-child(3), .mtable td:nth-child(3) { display: none; }
+  .stat-cards { grid-template-columns: repeat(2,1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- 글로벌 탭 -->
+<div class="global-tabs">
+  <button class="gtab active" onclick="showPage('reservation')">📅 예약 현황</button>
+  <button class="gtab" onclick="showPage('members')">👥 회원 관리</button>
+  <button class="gtab" onclick="showPage('stats')">📊 방문 통계</button>
+</div>
+
+<!-- ══ 예약 현황 ══ -->
+<div class="page active" id="page-reservation">
+  <div class="page-header">
+    <span class="page-title">예약 관리 시스템 <span id="syncStatus">연결 중...</span></span>
+  </div>
+  <div class="boards">
+    <div class="board screen" id="boardScreen"></div>
+    <div class="board park" id="boardPark"></div>
+  </div>
+</div>
+
+<!-- ══ 회원 관리 ══ -->
+<div class="page" id="page-members">
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="이름 또는 전화번호 검색..." oninput="filterMembers()">
+    <select id="gradeFilter" onchange="filterMembers()">
+      <option value="">전체 등급</option>
+      <option value="VIP">VIP</option><option value="우수">우수</option><option value="일반">일반</option>
+    </select>
+    <select id="sortFilter" onchange="filterMembers()">
+      <option value="name">이름순</option>
+      <option value="visits">방문 많은 순</option>
+      <option value="recent">최근 방문순</option>
+    </select>
+    <button class="btn primary" onclick="openAddMemberModal()">+ 회원 추가</button>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden;">
+    <table class="mtable">
+      <thead>
+        <tr>
+          <th>이름</th><th>연락처</th><th>차량번호</th>
+          <th>마지막 방문</th><th>방문 횟수</th><th>이용 패턴</th><th>등급</th>
+        </tr>
+      </thead>
+      <tbody id="memberBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ 방문 통계 ══ -->
+<div class="page" id="page-stats">
+  <div class="date-range">
+    <input type="date" id="dateFrom">
+    <span>~</span>
+    <input type="date" id="dateTo">
+    <button class="btn blue" onclick="calcStats()">조회</button>
+    <button class="btn" onclick="setQuick(7)">최근 7일</button>
+    <button class="btn" onclick="setQuick(30)">최근 30일</button>
+  </div>
+  <div class="stat-cards">
+    <div class="stat-card"><div class="stat-num" id="sTot">-</div><div class="stat-label">총 방문 횟수</div></div>
+    <div class="stat-card"><div class="stat-num" id="sUniq">-</div><div class="stat-label">방문 회원 수</div></div>
+    <div class="stat-card"><div class="stat-num" id="sAvg">-</div><div class="stat-label">1인 평균 방문</div></div>
+    <div class="stat-card"><div class="stat-num" id="sNew">-</div><div class="stat-label">신규 회원</div></div>
+  </div>
+  <div class="card">
+    <div style="font-size:14px;font-weight:800;margin-bottom:12px;">🏆 방문 순위</div>
+    <table class="rank-table">
+      <thead><tr><th style="width:36px;">순위</th><th>이름</th><th>방문 횟수</th><th>주 이용</th><th>등급</th></tr></thead>
+      <tbody id="rankBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 예약 입력 모달 -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <h3 id="mTitle" style="margin-bottom:0;">예약 입력</h3>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <label style="margin:0;font-size:12px;font-weight:700;color:var(--muted);">담당자</label>
+        <select id="mManager" style="width:auto;padding:6px 8px;font-size:13px;font-weight:700;">
+          <option value="">선택</option>
+          <option value="__new__">+ 직접 입력</option>
+        </select>
+      </div>
+    </div>
+    <div id="mManagerCustomWrap" style="display:none;margin-bottom:10px;">
+      <input type="text" id="mManagerCustom" placeholder="담당자 이름 입력 후 Enter" style="font-size:13px;"/>
+    </div>
+    <label>날짜</label><input type="date" id="mDate"/>
+    <label id="mBayLabel">방</label><select id="mBay"></select>
+    <label>시간</label>
+    <div class="time-row">
+      <div class="ts"><div style="font-size:10px;color:#999;margin-bottom:3px;font-weight:700;">시작</div><select id="mStart"></select></div>
+      <div class="arrow">→</div>
+      <div class="ts"><div style="font-size:10px;color:#999;margin-bottom:3px;font-weight:700;">종료</div><select id="mEnd"></select></div>
+    </div>
+    <div class="err-box" id="mErr"></div>
+    <label>예약자 정보</label>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="mName" placeholder="이름" style="flex:1;min-width:0;"/>
+      <input type="tel" id="mPhone" placeholder="연락처" style="flex:1.4;min-width:0;"/>
+    </div>
+    <label>인원</label>
+    <select id="mPeople">
+      <option value="1">1명</option><option value="2" selected>2명</option><option value="3">3명</option>
+      <option value="4">4명</option><option value="5">5명</option><option value="6">6명</option>
+      <option value="7">7명</option><option value="8">8명</option>
+    </select>
+    <label>홀 단위</label>
+    <select id="mHole">
+      <option value="9홀">9홀</option><option value="18홀" selected>18홀</option>
+      <option value="포섬">포섬</option><option value="포볼">포볼</option>
+    </select>
+    <label>메모 (선택)</label><textarea id="mNote" rows="2" placeholder="특이사항 등"></textarea>
+    <div class="modal-btns">
+      <button class="mbtn" id="mCancel">취소</button>
+      <button class="mbtn del" id="mDelete" style="display:none">삭제</button>
+      <button class="mbtn primary" id="mSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 회원 추가/수정 모달 -->
+<div class="mmodal-bg" id="memberModalBg">
+  <div class="mmodal">
+    <h3 id="memberModalTitle">회원 추가</h3>
+    <div class="form-row">
+      <div class="fg"><label>이름 *</label><input type="text" id="fName" placeholder="홍길동"></div>
+      <div class="fg"><label>연락처</label><input type="tel" id="fPhone" placeholder="010-0000-0000"></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>차량번호</label><input type="text" id="fCar" placeholder="12가 3456"></div>
+      <div class="fg"><label>등급</label>
+        <select id="fGrade"><option value="일반">일반</option><option value="우수">우수</option><option value="VIP">VIP</option></select>
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:10px;"><label>메모 추가</label><textarea id="fMemo" rows="2" placeholder="특이사항 등..."></textarea></div>
+    <div id="bookingAnalysis"></div>
+    <div id="existingMemos" style="display:none;margin-top:10px;">
+      <div style="font-size:12px;font-weight:800;color:var(--muted);margin-bottom:6px;">메모 이력</div>
+      <div id="memoList"></div>
+    </div>
+    <div class="mmodal-btns">
+      <button class="btn" onclick="closeMemberModal()">취소</button>
+      <button class="btn" id="btnDelMember" style="display:none;border-color:#e74c3c;color:#c0392b;" onclick="deleteMember()">삭제</button>
+      <button class="btn primary" onclick="saveMember()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="drag-ghost" id="dragGhost"></div>
+<div class="tooltip" id="tooltip"></div>
+
+<!-- 로딩 오버레이 -->
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <p style="margin-top:14px;font-size:14px;font-weight:600;color:#555;">데이터 불러오는 중...</p>
+</div>
+
+<!-- Firebase SDK (module) -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDWHBf0wUme5xbbxD8ShjH341ZWYEYHvBQ",
+  authDomain: "golf-67d3b.firebaseapp.com",
+  databaseURL: "https://golf-67d3b-default-rtdb.firebaseio.com",
+  projectId: "golf-67d3b",
+  storageBucket: "golf-67d3b.firebasestorage.app",
+  messagingSenderId: "874950944467",
+  appId: "1:874950944467:web:f409def04d0b1ad9d45626"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getDatabase(fbApp);
+
+// 예약 저장/삭제
+window.fbSave = function(type, key, data) {
+  const k = key.replace(/\./g,'_').replace(/__/g,'--');
+  set(ref(db, `bookings/${type}/${k}`), data).catch(e => console.warn('FB 저장 실패:', e));
+};
+window.fbDelete = function(type, key) {
+  const k = key.replace(/\./g,'_').replace(/__/g,'--');
+  remove(ref(db, `bookings/${type}/${k}`)).catch(e => console.warn('FB 삭제 실패:', e));
+};
+
+// 회원 저장/삭제
+window.fbSaveMember = function(id, data) {
+  set(ref(db, `members/${id}`), data).catch(e => console.warn('회원 저장 실패:', e));
+};
+window.fbDeleteMember = function(id) {
+  remove(ref(db, `members/${id}`)).catch(e => console.warn('회원 삭제 실패:', e));
+};
+
+let fbInitialized = false;
+
+// 예약 실시간 수신
+onValue(ref(db, 'bookings'), snapshot => {
+  const data = snapshot.val();
+  bookingsDB.screen = {};
+  bookingsDB.park = {};
+  if (data) {
+    ['screen','park'].forEach(type => {
+      if (!data[type]) return;
+      Object.values(data[type]).forEach(val => {
+        if (val && val._key) {
+          const { _key, ...rest } = val;
+          bookingsDB[type][_key] = rest;
+        }
+      });
+    });
+  }
+  ['screen','park'].forEach(type => {
+    if (typeof refreshTable === 'function') refreshTable(type);
+    if (typeof renderCal === 'function') renderCal(type);
+  });
+  document.getElementById('syncStatus').textContent = '✓ 동기화됨';
+  document.getElementById('syncStatus').style.color = '#1a7a4a';
+
+  if (!fbInitialized) {
+    fbInitialized = true;
+    document.getElementById('loadingOverlay').style.display = 'none';
+  }
+}, err => {
+  document.getElementById('syncStatus').textContent = '⚠ 연결 실패';
+  document.getElementById('syncStatus').style.color = '#c0392b';
+  document.getElementById('loadingOverlay').querySelector('p').textContent = '연결 실패 — 네트워크를 확인해주세요';
+});
+
+// 회원 실시간 수신
+onValue(ref(db, 'members'), snapshot => {
+  const data = snapshot.val();
+  membersDB = {};
+  if (data) {
+    Object.entries(data).forEach(([id, val]) => {
+      membersDB[id] = val;
+    });
+  }
+  if (typeof filterMembers === 'function') filterMembers();
+  if (typeof calcStats === 'function' && document.getElementById('page-stats').classList.contains('active')) calcStats();
+});
+</script>
+
+<!-- 메인 스크립트 -->
+<script>
+// ══ 예약 데이터 ══
+const PALETTE_SCREEN = [
+  {bg:'#DAEEFF',text:'#1a4a6e'},{bg:'#C8E8FF',text:'#153d5c'},
+  {bg:'#D4F0FF',text:'#1a4a6e'},{bg:'#BFE4FF',text:'#0f3350'},{bg:'#E0F4FF',text:'#1a4a6e'},
+];
+const PALETTE_PARK = [
+  {bg:'#C8EDCC',text:'#1a4d22'},{bg:'#B8E6BC',text:'#144018'},
+  {bg:'#CBEDD0',text:'#1a4d22'},{bg:'#A8DFB0',text:'#0f3314'},{bg:'#D4F0D8',text:'#1a4d22'},
+];
+const paletteIdx = { screen: 0, park: 0 };
+function nextPalette(type) {
+  const arr = type==='park' ? PALETTE_PARK : PALETTE_SCREEN;
+  const p = arr[paletteIdx[type] % arr.length];
+  paletteIdx[type]++;
+  return p;
+}
+
+const START_H = 9, END_H = 22;
+const slots = [];
+for (let h = START_H; h < END_H; h++)
+  for (let m = 0; m < 60; m += 10)
+    slots.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+slots.push('22:00');
+function si(t) { return slots.indexOf(t); }
+
+function toDateStr(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function formatLabel(s) {
+  const [y,m,d] = s.split('-');
+  const dt = new Date(+y,+m-1,+d);
+  return `${+m}월 ${+d}일 (${['일','월','화','수','목','금','토'][dt.getDay()]})`;
+}
+
+const LS_MANAGER_KEY = 'golf_last_manager_v1';
+const LS_MANAGER_LIST_KEY = 'golf_manager_list_v1';
+function getSavedManager() { try { return localStorage.getItem(LS_MANAGER_KEY)||''; } catch(e) { return ''; } }
+function saveManager(v) { try { localStorage.setItem(LS_MANAGER_KEY,v); } catch(e) {} }
+function getManagerList() { try { return JSON.parse(localStorage.getItem(LS_MANAGER_LIST_KEY)||'[]'); } catch(e) { return []; } }
+function addToManagerList(n) { if(!n) return; const l=getManagerList(); if(!l.includes(n)){l.push(n);localStorage.setItem(LS_MANAGER_LIST_KEY,JSON.stringify(l));} }
+function rebuildManagerSelect(sel) {
+  const el=document.getElementById('mManager');
+  const list=getManagerList();
+  el.innerHTML='<option value="">선택</option>';
+  list.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;el.appendChild(o);});
+  const a=document.createElement('option');a.value='__new__';a.textContent='+ 직접 입력';el.appendChild(a);
+  el.value=(sel&&list.includes(sel))?sel:'';
+}
+
+const bookingsDB = { screen:{}, park:{} };
+
+function saveToStorage(type, key, data) {
+  if (data===null) { if(window.fbDelete) window.fbDelete(type,key); }
+  else { if(window.fbSave) window.fbSave(type,key,{...data,_key:key}); }
+  document.getElementById('syncStatus').textContent='↑ 저장 중...';
+  document.getElementById('syncStatus').style.color='#888';
+}
+
+function bKey(date,bayIdx,start){ return `${date}__${bayIdx}__${start}`; }
+
+function getAt(type,date,bayIdx,time){
+  for(const key in bookingsDB[type]){
+    const b=bookingsDB[type][key];
+    if(b.date!==date||b.bayIdx!==bayIdx) continue;
+    if(si(time)>=si(b.start)&&si(time)<si(b.end)) return {key,b};
+  }
+  return null;
+}
+function hasConflict(type,date,bayIdx,start,end,excludeKey){
+  const s=si(start),e=si(end);
+  for(const key in bookingsDB[type]){
+    if(key===excludeKey) continue;
+    const b=bookingsDB[type][key];
+    if(b.date!==date||b.bayIdx!==bayIdx) continue;
+    if(s<si(b.end)&&e>si(b.start)) return true;
+  }
+  return false;
+}
+function hasBookingOnDate(type,date){ return Object.values(bookingsDB[type]).some(b=>b.date===date); }
+
+const BOARDS = [
+  { id:'boardScreen', type:'screen', title:'스크린골프 예약 현황', bays:['1번 방','3번 방','5번 방','7번 방'] },
+  { id:'boardPark', type:'park', title:'파크골프 예약 현황', bays:['1번 타석','2번 타석','3번 타석','4번 타석'] },
+];
+const boardState = {
+  screen:{ date:toDateStr(new Date()), calYear:0, calMonth:0 },
+  park:{ date:toDateStr(new Date()), calYear:0, calMonth:0 }
+};
+let drag=null, selectDrag=null, modalState=null;
+
+function shiftDate(type,delta){
+  const [y,m,d]=boardState[type].date.split('-').map(Number);
+  const dt=new Date(y,m-1,d+delta);
+  const ds=toDateStr(dt);
+  boardState[type].date=ds;
+  document.getElementById(`dateLabel_${type}`).textContent=formatLabel(ds);
+  refreshTable(type);
+  const pop=document.getElementById(`cal_${type}`);
+  if(pop.classList.contains('open')){ boardState[type].calYear=dt.getFullYear(); boardState[type].calMonth=dt.getMonth(); renderCal(type); }
+}
+
+function buildCalPopup(type,dateWrapEl){
+  const popup=document.createElement('div');
+  popup.className='cal-popup'; popup.id=`cal_${type}`;
+  const navRow=document.createElement('div'); navRow.className='cal-nav-row';
+  const prev=document.createElement('button'); prev.className='cal-nav'; prev.textContent='‹';
+  const next=document.createElement('button'); next.className='cal-nav'; next.textContent='›';
+  const lbl=document.createElement('span'); lbl.id=`calLbl_${type}`;
+  navRow.append(prev,lbl,next); popup.appendChild(navRow);
+  const grid=document.createElement('div'); grid.className='cal-grid'; grid.id=`calGrid_${type}`;
+  popup.appendChild(grid);
+  prev.addEventListener('click',e=>{e.stopPropagation();const s=boardState[type];s.calMonth--;if(s.calMonth<0){s.calMonth=11;s.calYear--;}renderCal(type);});
+  next.addEventListener('click',e=>{e.stopPropagation();const s=boardState[type];s.calMonth++;if(s.calMonth>11){s.calMonth=0;s.calYear++;}renderCal(type);});
+  dateWrapEl.appendChild(popup);
+}
+
+function renderCal(type){
+  const s=boardState[type];
+  document.getElementById(`calLbl_${type}`).textContent=`${s.calYear}년 ${s.calMonth+1}월`;
+  const grid=document.getElementById(`calGrid_${type}`);
+  grid.innerHTML='';
+  const dows=['일','월','화','수','목','금','토'];
+  dows.forEach((d,i)=>{const el=document.createElement('div');el.className='cal-dow'+(i===0?' sun':i===6?' sat':'');el.textContent=d;grid.appendChild(el);});
+  const firstDay=new Date(s.calYear,s.calMonth,1).getDay();
+  const daysInMonth=new Date(s.calYear,s.calMonth+1,0).getDate();
+  const prevDays=new Date(s.calYear,s.calMonth,0).getDate();
+  const todayStr=toDateStr(new Date());
+  for(let i=0;i<firstDay;i++){const el=document.createElement('div');el.className='cal-day other'+(i===0?' sun':i===6?' sat':'');el.textContent=prevDays-firstDay+1+i;grid.appendChild(el);}
+  for(let d=1;d<=daysInMonth;d++){
+    const el=document.createElement('div');
+    const dow=(firstDay+d-1)%7;
+    const ds=`${s.calYear}-${String(s.calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    el.className='cal-day'+(dow===0?' sun':dow===6?' sat':'');
+    if(ds===todayStr) el.classList.add('today');
+    if(ds===boardState[type].date) el.classList.add('selected');
+    if(hasBookingOnDate(type,ds)) el.classList.add('has-dot');
+    el.textContent=d;
+    el.addEventListener('click',()=>{boardState[type].date=ds;document.getElementById(`dateLabel_${type}`).textContent=formatLabel(ds);renderCal(type);refreshTable(type);document.getElementById(`cal_${type}`).classList.remove('open');});
+    grid.appendChild(el);
+  }
+  const rem=42-firstDay-daysInMonth;
+  for(let i=1;i<=rem;i++){const el=document.createElement('div');const dow=(firstDay+daysInMonth+i-1)%7;el.className='cal-day other'+(dow===0?' sun':dow===6?' sat':'');el.textContent=i;grid.appendChild(el);}
+}
+
+function buildBoard(cfg){
+  const container=document.getElementById(cfg.id);
+  container.innerHTML='';
+  const hdr=document.createElement('div'); hdr.className='board-header';
+  const title=document.createElement('div'); title.className='board-title';
+  const bold=cfg.type==='screen'?'스크린골프':'파크골프';
+  title.innerHTML=`<strong>${bold}</strong>${cfg.title.replace(bold,'')}`;
+  hdr.appendChild(title);
+
+  const dateWrap=document.createElement('div'); dateWrap.style.position='relative';
+  const controls=document.createElement('div'); controls.className='header-controls';
+
+  const todayBtn=document.createElement('button'); todayBtn.className='today-btn'; todayBtn.textContent='TODAY';
+  todayBtn.addEventListener('click',e=>{e.stopPropagation();const ts=toDateStr(new Date());boardState[cfg.type].date=ts;document.getElementById(`dateLabel_${cfg.type}`).textContent=formatLabel(ts);refreshTable(cfg.type);renderCal(cfg.type);document.getElementById(`cal_${cfg.type}`).classList.remove('open');});
+  controls.appendChild(todayBtn);
+
+  const prevBtn=document.createElement('button'); prevBtn.className='day-nav-btn'; prevBtn.innerHTML='&#8249;';
+  prevBtn.addEventListener('click',e=>{e.stopPropagation();shiftDate(cfg.type,-1);});
+  controls.appendChild(prevBtn);
+
+  const dateBtn=document.createElement('button'); dateBtn.className='date-btn'; dateBtn.id=`dateBtn_${cfg.type}`;
+  const calIco=`<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="14" height="13" rx="2" stroke="currentColor" stroke-width="1"/><line x1="1" y1="5.5" x2="15" y2="5.5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="1" x2="5" y2="4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="11" y1="1" x2="11" y2="4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+  const lblSpan=document.createElement('span'); lblSpan.id=`dateLabel_${cfg.type}`; lblSpan.textContent=formatLabel(boardState[cfg.type].date);
+  dateBtn.innerHTML=calIco; dateBtn.appendChild(lblSpan);
+  controls.appendChild(dateBtn);
+
+  const nextBtn=document.createElement('button'); nextBtn.className='day-nav-btn'; nextBtn.innerHTML='&#8250;';
+  nextBtn.addEventListener('click',e=>{e.stopPropagation();shiftDate(cfg.type,+1);});
+  controls.appendChild(nextBtn);
+
+  dateWrap.appendChild(controls);
+  buildCalPopup(cfg.type,dateWrap);
+  hdr.appendChild(dateWrap);
+  container.appendChild(hdr);
+
+  dateBtn.addEventListener('click',e=>{e.stopPropagation();const pop=document.getElementById(`cal_${cfg.type}`);if(!pop.classList.contains('open')){const [y,m]=boardState[cfg.type].date.split('-');boardState[cfg.type].calYear=+y;boardState[cfg.type].calMonth=+m-1;renderCal(cfg.type);}pop.classList.toggle('open');});
+
+  const wrap=document.createElement('div'); wrap.className='table-wrap';
+  const table=document.createElement('table'); table.id=`table_${cfg.type}`;
+  const thead=document.createElement('thead');
+  const hRow=document.createElement('tr');
+  const corner=document.createElement('th'); corner.className='corner'; hRow.appendChild(corner);
+  cfg.bays.forEach(bay=>{const th=document.createElement('th');th.className='col-head';th.textContent=bay;hRow.appendChild(th);});
+  thead.appendChild(hRow); table.appendChild(thead);
+
+  const tbody=document.createElement('tbody'); tbody.id=`tbody_${cfg.type}`;
+  const displaySlots=slots.slice(0,-1).concat(['22:00']);
+  displaySlots.forEach(time=>{
+    const isLast=(time==='22:00');
+    const isHour=time.endsWith(':00'); const isHalf=time.endsWith(':30');
+    const row=document.createElement('tr');
+    const lbl=document.createElement('td'); lbl.className='time-label';
+    lbl.textContent=time;
+    if(isHour||isHalf){lbl.style.fontWeight='800';lbl.style.fontSize='12px';lbl.style.color='#222';}
+    else{lbl.style.fontWeight='500';lbl.style.fontSize='10px';lbl.style.color='#999';}
+    if(isHour) row.style.borderTop='1px solid rgba(0,0,0,0.1)';
+    if(isHalf) row.style.borderTop='1px solid rgba(0,0,0,0.05)';
+    row.appendChild(lbl);
+    cfg.bays.forEach((bay,bayIdx)=>{
+      const td=document.createElement('td');
+      if(!isLast){
+        td.className='slot empty';
+        td.dataset.type=cfg.type; td.dataset.bay=bayIdx; td.dataset.time=time; td.dataset.bayName=bay;
+        if(isHour) td.style.borderTop='1px solid rgba(0,0,0,0.1)';
+        if(isHalf) td.style.borderTop='1px solid rgba(0,0,0,0.05)';
+        attachSlotEvents(td,cfg.type,bayIdx,time,bay);
+      } else {
+        td.className='slot empty'; td.style.cursor='default'; td.style.background='#fafafa';
+        if(isHour) td.style.borderTop='1px solid rgba(0,0,0,0.1)';
+      }
+      row.appendChild(td);
+    });
+    tbody.appendChild(row);
+  });
+  table.appendChild(tbody); wrap.appendChild(table); container.appendChild(wrap);
+}
+
+function attachSlotEvents(td,type,bayIdx,time,bayName){
+  td.addEventListener('mousedown',e=>{
+    if(e.button!==0) return;
+    const found=getAt(type,boardState[type].date,bayIdx,time);
+    if(found) startDrag(e,type,found.key,found.b,td);
+    else startSelectDrag(e,type,bayIdx,time);
+  });
+  td.addEventListener('click',e=>{
+    if(drag&&drag.moved) return;
+    if(selectDrag&&selectDrag.committed) return;
+    openModal(type,bayIdx,time,bayName);
+  });
+  td.addEventListener('touchstart',e=>{
+    const found=getAt(type,boardState[type].date,bayIdx,time);
+    if(found) startDragTouch(e,type,found.key,found.b,td);
+    else startSelectDragTouch(e,type,bayIdx,time);
+  },{passive:false});
+}
+
+// Drag & Select
+function startSelectDrag(e,type,bayIdx,startTime){e.preventDefault();selectDrag={type,bayIdx,startTime,endTime:startTime,moved:false,committed:false};highlightSelectPreview();}
+function highlightSelectPreview(){
+  if(!selectDrag) return;
+  clearSelectPreview();
+  const si1=si(selectDrag.startTime),si2=si(selectDrag.endTime);
+  const from=Math.min(si1,si2),to=Math.max(si1,si2);
+  const tbody=document.getElementById(`tbody_${selectDrag.type}`);
+  if(!tbody) return;
+  Array.from(tbody.rows).forEach(row=>Array.from(row.cells).slice(1).forEach(cell=>{
+    if(parseInt(cell.dataset.bay)!==selectDrag.bayIdx) return;
+    const ct=si(cell.dataset.time);
+    if(ct>=from&&ct<=to) cell.classList.add('select-preview');
+  }));
+}
+function clearSelectPreview(){document.querySelectorAll('.select-preview').forEach(el=>el.classList.remove('select-preview'));}
+
+function startDrag(e,type,key,b,originTd){
+  e.preventDefault();
+  const duration=si(b.end)-si(b.start);
+  drag={type,key,b,duration,clickOffset:si(originTd.dataset.time)-si(b.start),originTd,moved:false,preview:null};
+  const ghost=document.getElementById('dragGhost');
+  ghost.textContent=`${b.name} (${b.people}명)`;
+  ghost.style.display='block'; ghost.style.left=(e.clientX+12)+'px'; ghost.style.top=(e.clientY-16)+'px';
+  originTd.classList.add('dragging');
+  getDragCells(type,b).forEach(td=>td.classList.add('dragging'));
+}
+function getDragCells(type,b){
+  const tbody=document.getElementById(`tbody_${type}`); if(!tbody) return [];
+  const s=si(b.start),e=si(b.end),cells=[];
+  Array.from(tbody.rows).forEach(row=>Array.from(row.cells).slice(1).forEach(td=>{const t=si(td.dataset.time);if(parseInt(td.dataset.bay)===b.bayIdx&&t>=s&&t<e)cells.push(td);}));
+  return cells;
+}
+function getTdAtPoint(x,y){const el=document.elementFromPoint(x,y);return el?el.closest('td.slot'):null;}
+function clearDragHighlights(){document.querySelectorAll('.drag-over,.drag-invalid').forEach(el=>el.classList.remove('drag-over','drag-invalid'));}
+
+document.addEventListener('mousemove',e=>{
+  if(selectDrag){
+    selectDrag.moved=true;
+    const ghost=document.getElementById('dragGhost');ghost.style.display='none';
+    const el=document.elementFromPoint(e.clientX,e.clientY);ghost.style.display='none';
+    const td=el?el.closest('td.slot'):null;
+    if(td&&td.dataset.type===selectDrag.type&&parseInt(td.dataset.bay)===selectDrag.bayIdx){selectDrag.endTime=td.dataset.time;highlightSelectPreview();}
+    return;
+  }
+  if(!drag) return;
+  drag.moved=true;
+  const ghost=document.getElementById('dragGhost');
+  ghost.style.left=(e.clientX+12)+'px'; ghost.style.top=(e.clientY-16)+'px';
+  ghost.style.display='none';
+  const el=document.elementFromPoint(e.clientX,e.clientY);
+  ghost.style.display='block';
+  const td=el?el.closest('td.slot'):null;
+  clearDragHighlights();
+  if(td&&td.dataset.type===drag.type){
+    const tb=parseInt(td.dataset.bay);
+    const nsi=si(td.dataset.time)-drag.clickOffset;
+    const nei=nsi+drag.duration;
+    if(nsi>=0&&nei<slots.length){
+      const ns=slots[nsi],ne=slots[nei];
+      const conflict=hasConflict(drag.type,drag.b.date,tb,ns,ne,drag.key);
+      const tbody=document.getElementById(`tbody_${drag.type}`);
+      Array.from(tbody.rows).forEach(row=>Array.from(row.cells).slice(1).forEach(cell=>{
+        const ci=si(cell.dataset.time);
+        if(parseInt(cell.dataset.bay)===tb&&ci>=nsi&&ci<nei) cell.classList.add(conflict?'drag-invalid':'drag-over');
+      }));
+      drag.preview=conflict?null:{bayIdx:tb,start:ns,end:ne};
+    } else drag.preview=null;
+  } else drag.preview=null;
+});
+
+document.addEventListener('mouseup',e=>{
+  if(selectDrag){
+    clearSelectPreview();
+    if(selectDrag.moved){
+      const si1=si(selectDrag.startTime),si2=si(selectDrag.endTime);
+      const fromIdx=Math.min(si1,si2),toIdx=Math.max(si1,si2)+1;
+      const start=slots[fromIdx],end=slots[Math.min(toIdx,slots.length-1)];
+      selectDrag.committed=true;
+      const ct=selectDrag.type,cb=selectDrag.bayIdx;
+      selectDrag=null; openModalForNew(ct,cb,start,end);
+    } else selectDrag=null;
+    return;
+  }
+  if(!drag) return;
+  document.getElementById('dragGhost').style.display='none';
+  clearDragHighlights();
+  if(drag.moved&&drag.preview){
+    const {type,key,b}=drag,{bayIdx,start,end}=drag.preview;
+    saveToStorage(type,key,null); delete bookingsDB[type][key];
+    const nk=bKey(b.date,bayIdx,start),nd={...b,bayIdx,start,end};
+    bookingsDB[type][nk]=nd; saveToStorage(type,nk,nd);
+    refreshTable(type); renderCal(type);
+  } else {document.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'));refreshTable(drag.type);}
+  drag=null;
+});
+
+// Touch drag
+function startDragTouch(e,type,key,b,originTd){
+  e.preventDefault();
+  const duration=si(b.end)-si(b.start);
+  drag={type,key,b,duration,clickOffset:si(originTd.dataset.time)-si(b.start),originTd,moved:false,preview:null};
+  originTd.classList.add('dragging'); getDragCells(type,b).forEach(td=>td.classList.add('dragging'));
+  originTd.addEventListener('touchmove',onTMD,{passive:false});
+  originTd.addEventListener('touchend',onTED);
+}
+function onTMD(e){
+  e.preventDefault(); if(!drag) return; drag.moved=true;
+  const t=e.touches[0]; clearDragHighlights();
+  const td=getTdAtPoint(t.clientX,t.clientY);
+  if(td&&td.dataset.type===drag.type){
+    const tb=parseInt(td.dataset.bay),nsi=si(td.dataset.time)-drag.clickOffset,nei=nsi+drag.duration;
+    if(nsi>=0&&nei<slots.length){
+      const ns=slots[nsi],ne=slots[nei];
+      const conflict=hasConflict(drag.type,drag.b.date,tb,ns,ne,drag.key);
+      const tbody=document.getElementById(`tbody_${drag.type}`);
+      Array.from(tbody.rows).forEach(row=>Array.from(row.cells).slice(1).forEach(cell=>{const ci=si(cell.dataset.time);if(parseInt(cell.dataset.bay)===tb&&ci>=nsi&&ci<nei)cell.classList.add(conflict?'drag-invalid':'drag-over');}));
+      drag.preview=conflict?null:{bayIdx:tb,start:ns,end:ne};
+    } else drag.preview=null;
+  } else drag.preview=null;
+}
+function onTED(e){
+  if(!drag) return;
+  this.removeEventListener('touchmove',onTMD); this.removeEventListener('touchend',onTED);
+  clearDragHighlights();
+  if(drag.moved&&drag.preview){
+    const {type,key,b}=drag,{bayIdx,start,end}=drag.preview;
+    saveToStorage(type,key,null); delete bookingsDB[type][key];
+    const nk=bKey(b.date,bayIdx,start),nd={...b,bayIdx,start,end};
+    bookingsDB[type][nk]=nd; saveToStorage(type,nk,nd);
+    refreshTable(type); renderCal(type);
+  } else {document.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'));refreshTable(drag.type);}
+  drag=null;
+}
+function startSelectDragTouch(e,type,bayIdx,startTime){
+  e.preventDefault();
+  selectDrag={type,bayIdx,startTime,endTime:startTime,moved:false,committed:false};
+  highlightSelectPreview();
+  const h=e2=>{e2.preventDefault();selectDrag.moved=true;const t=e2.touches[0];const td=getTdAtPoint(t.clientX,t.clientY);if(td&&td.dataset.type===selectDrag.type&&parseInt(td.dataset.bay)===selectDrag.bayIdx){selectDrag.endTime=td.dataset.time;highlightSelectPreview();}};
+  const eh=()=>{document.removeEventListener('touchmove',h);document.removeEventListener('touchend',eh);clearSelectPreview();if(selectDrag&&selectDrag.moved){const si1=si(selectDrag.startTime),si2=si(selectDrag.endTime);const fi=Math.min(si1,si2),ti=Math.max(si1,si2)+1;const start=slots[fi],end=slots[Math.min(ti,slots.length-1)];selectDrag.committed=true;const ct=selectDrag.type,cb=selectDrag.bayIdx;selectDrag=null;openModalForNew(ct,cb,start,end);}else{if(selectDrag){const{type:t2,bayIdx:bi2}=selectDrag;selectDrag=null;openModal(t2,bi2,startTime,'');}}};
+  document.addEventListener('touchmove',h,{passive:false});
+  document.addEventListener('touchend',eh);
+}
+
+function refreshTable(type){
+  const tbody=document.getElementById(`tbody_${type}`); if(!tbody) return;
+  const date=boardState[type].date,timeSlots=slots.slice(0,-1);
+  Array.from(tbody.rows).forEach((row,ti)=>{
+    const time=timeSlots[ti];
+    Array.from(row.cells).slice(1).forEach((td,bi)=>{
+      const found=getAt(type,date,bi,time);
+      if(found){
+        const b=found.b,p=b.palette||nextPalette(type);
+        td.className='slot booked'; td.style.background=p.bg; td.style.borderColor='rgba(0,0,0,0.08)';
+        const isStart=(time===b.start),duration=si(b.end)-si(b.start),totalHeight=duration*22;
+        if(isStart){
+          td.style.overflow='visible'; td.style.position='relative'; td.style.zIndex='3';
+          const memoLine=b.note?`<span class="slot-memo" style="color:${p.text}">📝 ${b.note}</span>`:'';
+          td.innerHTML=`<div class="slot-content" style="height:${totalHeight}px;background:${p.bg};border:1.5px solid rgba(0,0,0,0.45);border-radius:4px;pointer-events:none;">
+            <span class="slot-time" style="color:${p.text}">${b.start} ~ ${b.end}</span>
+            <span class="slot-main" style="color:${p.text}">${b.name} ${b.people}명</span>
+            <span class="slot-sub" style="color:${p.text}">${b.hole||''}</span>${memoLine}</div>`;
+        } else {td.style.overflow='visible';td.style.position='relative';td.innerHTML='';}
+      } else {td.className='slot empty';td.style.cssText='';td.innerHTML='';}
+    });
+  });
+}
+
+function populateTimeSelects(startTime){
+  const ss=document.getElementById('mStart'),es=document.getElementById('mEnd');
+  ss.innerHTML=''; es.innerHTML='';
+  slots.slice(0,-1).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;ss.appendChild(o);});
+  slots.slice(1).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;es.appendChild(o);});
+  ss.value=startTime; updateEndOpts();
+}
+function updateEndOpts(){
+  const sv=si(document.getElementById('mStart').value),es=document.getElementById('mEnd');
+  Array.from(es.options).forEach(o=>{o.disabled=si(o.value)<=sv;});
+  if(si(es.value)<=sv){const f=Array.from(es.options).find(o=>!o.disabled);if(f)es.value=f.value;}
+}
+document.getElementById('mStart').addEventListener('change',updateEndOpts);
+
+function openModal(type,bayIdx,time,bayName){
+  const found=getAt(type,boardState[type].date,bayIdx,time);
+  const b=found?found.b:null;
+  const cfg=BOARDS.find(c=>c.type===type);
+  modalState={type,editKey:found?found.key:null};
+  document.getElementById('mTitle').textContent=b?'예약 수정':'예약 입력';
+  document.getElementById('mBayLabel').textContent=type==='park'?'타석':'방';
+  document.getElementById('mDate').value=b?b.date:boardState[type].date;
+  document.getElementById('mErr').style.display='none';
+  const bs=document.getElementById('mBay'); bs.innerHTML='';
+  cfg.bays.forEach((bn,i)=>{const o=document.createElement('option');o.value=i;o.textContent=bn;bs.appendChild(o);});
+  bs.value=b?b.bayIdx:bayIdx;
+  populateTimeSelects(b?b.start:time);
+  if(b){document.getElementById('mEnd').value=b.end;}
+  else{document.getElementById('mEnd').value=slots[Math.min(si(time)+2,slots.length-1)];}
+  updateEndOpts();
+  document.getElementById('mName').value=b?b.name:'';
+  document.getElementById('mPhone').value=b?(b.phone||''):'';
+  document.getElementById('mPeople').value=b?b.people:'2';
+  document.getElementById('mHole').value=b?(b.hole||'18홀'):'18홀';
+  document.getElementById('mNote').value=b?(b.note||''):'';
+  rebuildManagerSelect(b?(b.manager||''):getSavedManager());
+  document.getElementById('mManagerCustomWrap').style.display='none';
+  document.getElementById('mDelete').style.display=b?'block':'none';
+  document.getElementById('modalBg').classList.add('open');
+  setTimeout(()=>document.getElementById('mName').focus(),50);
+}
+function openModalForNew(type,bayIdx,start,end){
+  const cfg=BOARDS.find(c=>c.type===type);
+  modalState={type,editKey:null};
+  document.getElementById('mTitle').textContent='예약 입력';
+  document.getElementById('mBayLabel').textContent=type==='park'?'타석':'방';
+  document.getElementById('mDate').value=boardState[type].date;
+  document.getElementById('mErr').style.display='none';
+  const bs=document.getElementById('mBay'); bs.innerHTML='';
+  cfg.bays.forEach((bn,i)=>{const o=document.createElement('option');o.value=i;o.textContent=bn;bs.appendChild(o);});
+  bs.value=bayIdx;
+  populateTimeSelects(start);
+  document.getElementById('mEnd').value=end; updateEndOpts();
+  document.getElementById('mName').value=''; document.getElementById('mPhone').value='';
+  document.getElementById('mPeople').value='2'; document.getElementById('mHole').value='18홀'; document.getElementById('mNote').value='';
+  rebuildManagerSelect(getSavedManager());
+  document.getElementById('mManagerCustomWrap').style.display='none';
+  document.getElementById('mDelete').style.display='none';
+  document.getElementById('modalBg').classList.add('open');
+  setTimeout(()=>document.getElementById('mName').focus(),50);
+}
+
+document.getElementById('mManager').addEventListener('change',function(){
+  if(this.value==='__new__'){document.getElementById('mManagerCustomWrap').style.display='block';setTimeout(()=>document.getElementById('mManagerCustom').focus(),30);}
+  else{document.getElementById('mManagerCustomWrap').style.display='none';document.getElementById('mManagerCustom').value='';if(this.value)saveManager(this.value);}
+});
+document.getElementById('mManagerCustom').addEventListener('keydown',function(e){
+  if(e.key==='Enter'){const n=this.value.trim();if(!n)return;addToManagerList(n);saveManager(n);rebuildManagerSelect(n);document.getElementById('mManagerCustomWrap').style.display='none';this.value='';}
+});
+
+document.getElementById('mSave').addEventListener('click',()=>{
+  const {type,editKey}=modalState;
+  const name=document.getElementById('mName').value.trim();
+  const phone=document.getElementById('mPhone').value.trim();
+  const date=document.getElementById('mDate').value;
+  const bayIdx=parseInt(document.getElementById('mBay').value);
+  const start=document.getElementById('mStart').value,end=document.getElementById('mEnd').value;
+  const hole=document.getElementById('mHole').value;
+  const mgrSel=document.getElementById('mManager');
+  const manager=mgrSel.value==='__new__'?document.getElementById('mManagerCustom').value.trim():mgrSel.value;
+  const errEl=document.getElementById('mErr');
+  if(si(end)<=si(start)){errEl.textContent='종료 시간은 시작 시간 이후여야 합니다.';errEl.style.display='block';return;}
+  if(!name){document.getElementById('mName').focus();return;}
+  if(hasConflict(type,date,bayIdx,start,end,editKey)){errEl.textContent='해당 시간대에 이미 예약이 있습니다. (ERR: 예약 중복)';errEl.style.display='block';return;}
+  errEl.style.display='none';
+  if(manager){addToManagerList(manager);saveManager(manager);}
+  const palette=(editKey&&bookingsDB[type][editKey])?bookingsDB[type][editKey].palette:nextPalette(type);
+  if(editKey){saveToStorage(type,editKey,null);delete bookingsDB[type][editKey];}
+  const nk=bKey(date,bayIdx,start);
+  const nd={date,bayIdx,start,end,name,phone,people:document.getElementById('mPeople').value,hole,manager,note:document.getElementById('mNote').value.trim(),palette};
+  bookingsDB[type][nk]=nd; saveToStorage(type,nk,nd);
+  refreshTable(type); renderCal(type);
+  document.getElementById('modalBg').classList.remove('open');
+});
+document.getElementById('mDelete').addEventListener('click',()=>{
+  const {type,editKey}=modalState;
+  if(editKey){saveToStorage(type,editKey,null);delete bookingsDB[type][editKey];}
+  refreshTable(type); renderCal(type);
+  document.getElementById('modalBg').classList.remove('open');
+});
+document.getElementById('mCancel').addEventListener('click',()=>document.getElementById('modalBg').classList.remove('open'));
+let modalMD=null;
+document.getElementById('modalBg').addEventListener('mousedown',e=>{modalMD=e.target;});
+document.getElementById('modalBg').addEventListener('click',e=>{if(e.target===document.getElementById('modalBg')&&modalMD===document.getElementById('modalBg'))document.getElementById('modalBg').classList.remove('open');modalMD=null;});
+
+document.addEventListener('click',e=>{
+  BOARDS.forEach(cfg=>{
+    const pop=document.getElementById(`cal_${cfg.type}`);
+    const btn=document.getElementById(`dateBtn_${cfg.type}`);
+    if(pop&&!pop.contains(e.target)&&!btn.contains(e.target))pop.classList.remove('open');
+  });
+});
+
+// ══ 회원 관리 ══
+let membersDB = {};
+let editingMemberId = null;
+let memberNextId = 1;
+
+function daysSince(d){ return Math.floor((new Date()-new Date(d))/86400000); }
+function gc(g){ return g==='VIP'?'b-vip':g==='우수'?'b-good':'b-normal'; }
+function dotC(d){ const n=daysSince(d); return n<=7?'dot-r':n<=30?'dot-m':'dot-o'; }
+
+function analyzeBookings(name){
+  // 예약 DB에서 해당 이름의 예약 분석
+  const hist=[];
+  ['screen','park'].forEach(type=>{
+    Object.values(bookingsDB[type]).forEach(b=>{
+      if(b.name===name){
+        const dt=new Date(b.date);
+        hist.push({type,date:b.date,start:b.start,dow:dt.getDay()});
+      }
+    });
+  });
+  if(!hist.length) return null;
+  const sc=hist.filter(b=>b.type==='screen').length;
+  const pk=hist.filter(b=>b.type==='park').length;
+  const tot=hist.length;
+  const weCnt=hist.filter(b=>b.dow===0||b.dow===6).length;
+  const wdCnt=tot-weCnt;
+  const tb={'오전(~12시)':0,'오후(12~17시)':0,'저녁(17~20시)':0,'야간(20시~)':0};
+  hist.forEach(b=>{const h=parseInt(b.start.split(':')[0]);if(h<12)tb['오전(~12시)']++;else if(h<17)tb['오후(12~17시)']++;else if(h<20)tb['저녁(17~20시)']++;else tb['야간(20시~)']++;});
+  const topTime=Object.entries(tb).sort((a,b)=>b[1]-a[1])[0];
+  return {sc,pk,tot,weCnt,wdCnt,tb,topTime};
+}
+
+function analysisTags(name){
+  const a=analyzeBookings(name);
+  if(!a) return '<span style="color:var(--faint);font-size:12px;">이력 없음</span>';
+  const tags=[];
+  if(a.sc>0&&a.pk>0) tags.push('<span class="badge b-both">스크린+파크</span>');
+  else if(a.sc>0) tags.push('<span class="badge b-screen">스크린골프</span>');
+  else tags.push('<span class="badge b-park">파크골프</span>');
+  if(a.weCnt>=a.wdCnt) tags.push('<span class="badge b-weekend">주말 선호</span>');
+  else tags.push('<span class="badge b-weekday">평일 선호</span>');
+  if(a.topTime) tags.push(`<span class="badge b-time">${a.topTime[0]}</span>`);
+  return `<div class="tag-row">${tags.join('')}</div>`;
+}
+
+function analysisBoxHTML(name){
+  const a=analyzeBookings(name);
+  if(!a) return '<div class="analysis-box"><div class="a-title">📊 예약 이력 없음</div><div style="font-size:12px;color:var(--muted);">아직 예약 이력이 없습니다.</div></div>';
+  const sPct=Math.round(a.sc/a.tot*100),wePct=Math.round(a.weCnt/a.tot*100);
+  const timeRows=Object.entries(a.tb).filter(([,v])=>v>0).sort((x,y)=>y[1]-x[1])
+    .map(([k,v])=>`<div class="a-row"><span class="a-label">${k}</span><div class="a-bar-wrap"><div class="a-bar bar-amber" style="width:${Math.round(v/a.tot*100)}%"></div></div><span class="a-count">${v}회</span></div>`).join('');
+  return `<div class="analysis-box">
+    <div class="a-title">📊 예약 이력 기반 분석 (총 ${a.tot}회)</div>
+    <div class="a-section">이용 종류</div>
+    <div class="a-row"><span class="a-label">스크린골프</span><div class="a-bar-wrap"><div class="a-bar bar-blue" style="width:${sPct}%"></div></div><span class="a-count">${a.sc}회</span></div>
+    <div class="a-row"><span class="a-label">파크골프</span><div class="a-bar-wrap"><div class="a-bar bar-green" style="width:${100-sPct}%"></div></div><span class="a-count">${a.pk}회</span></div>
+    <div class="a-section">요일 패턴</div>
+    <div class="a-row"><span class="a-label">주말 (토·일)</span><div class="a-bar-wrap"><div class="a-bar bar-amber" style="width:${wePct}%"></div></div><span class="a-count">${a.weCnt}회</span></div>
+    <div class="a-row"><span class="a-label">평일</span><div class="a-bar-wrap"><div class="a-bar bar-blue" style="width:${100-wePct}%"></div></div><span class="a-count">${a.wdCnt}회</span></div>
+    <div class="a-section">시간대 패턴</div>${timeRows}
+  </div>`;
+}
+
+function getMemberVisits(name){
+  let cnt=0;
+  ['screen','park'].forEach(type=>{ Object.values(bookingsDB[type]).forEach(b=>{if(b.name===name)cnt++;}); });
+  return cnt;
+}
+function getLastVisit(name){
+  let last='';
+  ['screen','park'].forEach(type=>{ Object.values(bookingsDB[type]).forEach(b=>{if(b.name===name&&b.date>last)last=b.date;}); });
+  return last;
+}
+
+function filterMembers(){
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  const gr=document.getElementById('gradeFilter').value;
+  const so=document.getElementById('sortFilter').value;
+  let list=Object.values(membersDB).filter(m=>(!q||m.name.includes(q)||( m.phone&&m.phone.includes(q)))&&(!gr||m.grade===gr));
+
+  list.forEach(m=>{m._visits=getMemberVisits(m.name);m._last=getLastVisit(m.name)||m.joinDate;});
+  if(so==='visits') list.sort((a,b)=>b._visits-a._visits);
+  else if(so==='recent') list.sort((a,b)=>b._last.localeCompare(a._last));
+  else list.sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+
+  const tbody=document.getElementById('memberBody');
+  tbody.innerHTML='';
+  if(!list.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">등록된 회원이 없습니다</td></tr>';return;}
+  list.forEach(m=>{
+    const d=daysSince(m._last);
+    const ls=d===0?'오늘':d===1?'어제':`${d}일 전`;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td style="font-weight:800;">${m.name}</td>
+      <td style="color:var(--muted)">${m.phone||'-'}</td>
+      <td style="color:var(--muted)">${m.car||'-'}</td>
+      <td><span class="vdot ${dotC(m._last)}"></span>${ls}</td>
+      <td style="font-weight:800;">${m._visits}회</td>
+      <td>${analysisTags(m.name)}</td>
+      <td><span class="badge ${gc(m.grade)}">${m.grade}</span></td>`;
+    tr.addEventListener('click',()=>openEditMemberModal(m.id));
+    tr.addEventListener('mouseenter',e=>showTip(e,m));
+    tr.addEventListener('mousemove',moveTip);
+    tr.addEventListener('mouseleave',hideTip);
+    tbody.appendChild(tr);
+  });
+}
+
+function showTip(e,m){
+  const t=document.getElementById('tooltip');
+  const a=analyzeBookings(m.name);
+  const d=daysSince(m._last||m.joinDate);
+  const ls=d===0?'오늘':d===1?'어제':`${d}일 전`;
+  let aHTML='';
+  if(a){const types=[];if(a.sc>0)types.push(`스크린 ${a.sc}회`);if(a.pk>0)types.push(`파크 ${a.pk}회`);aHTML=`<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,0.15);font-size:11px;opacity:0.9;"><div>⛳ ${types.join(' / ')}</div><div>${a.weCnt>=a.wdCnt?'📅 주말 선호':'📅 평일 선호'} · ${a.topTime[0]}</div></div>`;}
+  t.innerHTML=`<div class="t-name">${m.name} <span class="badge ${gc(m.grade)}" style="font-size:10px;">${m.grade}</span></div>
+    <div>📞 ${m.phone||'-'}</div><div>🚗 ${m.car||'-'}</div>
+    <div>🕐 마지막 방문: ${ls}</div><div>📊 예약 이력: ${m._visits||0}회</div>${aHTML}
+    ${m.memos&&m.memos.length?`<div style="margin-top:4px;opacity:0.7;font-size:11px;">📝 ${m.memos[m.memos.length-1].text}</div>`:''}`;
+  t.style.display='block'; moveTip(e);
+}
+function moveTip(e){
+  const t=document.getElementById('tooltip');
+  const x=e.clientX+14,y=e.clientY-10;
+  t.style.left=(x+t.offsetWidth>window.innerWidth?x-t.offsetWidth-20:x)+'px';
+  t.style.top=(y+t.offsetHeight>window.innerHeight?y-t.offsetHeight:y)+'px';
+}
+function hideTip(){document.getElementById('tooltip').style.display='none';}
+
+function openAddMemberModal(){
+  editingMemberId=null;
+  document.getElementById('memberModalTitle').textContent='회원 추가';
+  ['fName','fPhone','fCar','fMemo'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fGrade').value='일반';
+  document.getElementById('existingMemos').style.display='none';
+  document.getElementById('bookingAnalysis').innerHTML='';
+  document.getElementById('btnDelMember').style.display='none';
+  document.getElementById('memberModalBg').classList.add('open');
+}
+function openEditMemberModal(id){
+  editingMemberId=id;
+  const m=membersDB[id];
+  document.getElementById('memberModalTitle').textContent='회원 수정 — '+m.name;
+  document.getElementById('fName').value=m.name;
+  document.getElementById('fPhone').value=m.phone||'';
+  document.getElementById('fCar').value=m.car||'';
+  document.getElementById('fGrade').value=m.grade||'일반';
+  document.getElementById('fMemo').value='';
+  document.getElementById('btnDelMember').style.display='block';
+  document.getElementById('bookingAnalysis').innerHTML=analysisBoxHTML(m.name);
+  const mw=document.getElementById('existingMemos');
+  if(m.memos&&m.memos.length){
+    mw.style.display='block';
+    document.getElementById('memoList').innerHTML=[...m.memos].reverse()
+      .map(memo=>`<div class="memo-item"><div class="memo-date">${memo.date}</div><div class="memo-text">${memo.text}</div></div>`).join('');
+  } else mw.style.display='none';
+  document.getElementById('memberModalBg').classList.add('open');
+}
+function closeMemberModal(){document.getElementById('memberModalBg').classList.remove('open');}
+
+function saveMember(){
+  const name=document.getElementById('fName').value.trim();
+  if(!name){document.getElementById('fName').focus();return;}
+  const memo=document.getElementById('fMemo').value.trim();
+  const today=toDateStr(new Date());
+  if(editingMemberId){
+    const m=membersDB[editingMemberId];
+    m.name=name; m.phone=document.getElementById('fPhone').value.trim();
+    m.car=document.getElementById('fCar').value.trim(); m.grade=document.getElementById('fGrade').value;
+    if(memo){if(!m.memos)m.memos=[];m.memos.push({date:today,text:memo});}
+    if(window.fbSaveMember) window.fbSaveMember(editingMemberId,m);
+  } else {
+    const id='m_'+Date.now();
+    const newMember={id,name,phone:document.getElementById('fPhone').value.trim(),car:document.getElementById('fCar').value.trim(),grade:document.getElementById('fGrade').value,joinDate:today,memos:memo?[{date:today,text:memo}]:[]};
+    membersDB[id]=newMember;
+    if(window.fbSaveMember) window.fbSaveMember(id,newMember);
+  }
+  closeMemberModal(); filterMembers();
+}
+function deleteMember(){
+  if(!confirm('정말 삭제하시겠습니까?')) return;
+  if(window.fbDeleteMember) window.fbDeleteMember(editingMemberId);
+  delete membersDB[editingMemberId];
+  closeMemberModal(); filterMembers();
+}
+
+document.getElementById('memberModalBg').addEventListener('click',e=>{if(e.target===document.getElementById('memberModalBg'))closeMemberModal();});
+
+// ══ 방문 통계 ══
+function setQuick(days){
+  const to=new Date(),from=new Date(); from.setDate(from.getDate()-days);
+  document.getElementById('dateFrom').value=toDateStr(from);
+  document.getElementById('dateTo').value=toDateStr(to);
+  calcStats();
+}
+function calcStats(){
+  const from=document.getElementById('dateFrom').value;
+  const to=document.getElementById('dateTo').value;
+  if(!from||!to) return;
+
+  // 기간 내 예약 집계
+  const nameVisits={};
+  ['screen','park'].forEach(type=>{
+    Object.values(bookingsDB[type]).forEach(b=>{
+      if(b.date>=from&&b.date<=to){
+        if(!nameVisits[b.name]) nameVisits[b.name]={visits:0,types:{screen:0,park:0}};
+        nameVisits[b.name].visits++;
+        nameVisits[b.name].types[type]++;
+      }
+    });
+  });
+
+  const allMembers=Object.values(membersDB);
+  const newM=allMembers.filter(m=>m.joinDate>=from&&m.joinDate<=to).length;
+  const visitList=Object.entries(nameVisits).sort((a,b)=>b[1].visits-a[1].visits);
+  const tot=visitList.reduce((s,[,v])=>s+v.visits,0);
+  const uniq=visitList.length;
+
+  document.getElementById('sTot').textContent=tot;
+  document.getElementById('sUniq').textContent=uniq;
+  document.getElementById('sAvg').textContent=uniq?(tot/uniq).toFixed(1):0;
+  document.getElementById('sNew').textContent=newM;
+
+  const max=visitList[0]?.[1].visits||1;
+  const rc=['r1','r2','r3'];
+  document.getElementById('rankBody').innerHTML=visitList.map(([name,v],i)=>{
+    const m=Object.values(membersDB).find(x=>x.name===name);
+    const grade=m?m.grade:'일반';
+    const isG=v.types.park>=v.types.screen;
+    const tag=v.types.screen>0&&v.types.park>0?'<span class="badge b-both">스크린+파크</span>':v.types.screen>0?'<span class="badge b-screen">스크린</span>':'<span class="badge b-park">파크</span>';
+    return `<tr>
+      <td class="rn ${rc[i]||''}">${i+1}</td>
+      <td style="font-weight:800;">${name}</td>
+      <td><div style="font-weight:800;">${v.visits}회</div><div class="bbar-wrap"><div class="bbar-fill${isG?' g':''}" style="width:${Math.round(v.visits/max*100)}%"></div></div></td>
+      <td>${tag}</td>
+      <td><span class="badge ${gc(grade)}">${grade}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══ 탭 전환 ══
+function showPage(name){
+  document.querySelectorAll('.gtab').forEach((t,i)=>{
+    t.classList.toggle('active',(name==='reservation'&&i===0)||(name==='members'&&i===1)||(name==='stats'&&i===2));
+  });
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  if(name==='members') filterMembers();
+  if(name==='stats'){ const t=new Date();setQuick(30); }
+}
+
+// ══ Init ══
+const today=toDateStr(new Date());
+document.getElementById('dateFrom').value=today;
+document.getElementById('dateTo').value=today;
+BOARDS.forEach(cfg=>buildBoard(cfg));
+BOARDS.forEach(cfg=>refreshTable(cfg.type));
+</script>
+</body>
+</html>
