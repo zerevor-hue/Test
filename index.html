@@ -130,7 +130,7 @@ th.col-head { background: #fafafa; font-weight: 800; font-size: 13px; padding: 1
 .board.screen th.col-head { color: var(--accent-screen); }
 .board.park th.col-head { color: var(--accent-park); }
 td.time-label { background: #fafafa; color: #444; font-size: 11px; font-weight: 800; padding: 3px 12px; position: sticky; left: 0; z-index: 2; white-space: nowrap; }
-td.slot { height: 22px; cursor: pointer; vertical-align: top; background: #fff; transition: background 0.1s; position: relative; user-select: none; touch-action: none; overflow: visible; }
+td.slot { height: 22px; cursor: pointer; vertical-align: top; background: #fff; transition: background 0.1s; position: relative; user-select: none; touch-action: none; overflow: hidden; }
 td.slot.empty:hover { background: #f0f6ff; }
 td.slot.drag-over { background: #e8f4e8 !important; outline: 2px dashed #1a7a4a; outline-offset: -2px; }
 td.slot.drag-invalid { background: #fff0f0 !important; outline: 2px dashed #c0392b; outline-offset: -2px; }
@@ -138,7 +138,7 @@ td.slot.select-preview { background: #dbeafe !important; outline: 2px dashed #25
 td.slot.booked { cursor: grab; overflow: visible; }
 td.slot.booked:active { cursor: grabbing; }
 td.slot.dragging { opacity: 0.4; }
-.slot-content { position: absolute; top: 0; left: 0; right: 0; padding: 4px 4px; z-index: 3; pointer-events: none; text-align: center; overflow: hidden; border-radius: 3px; }
+.slot-content { position: absolute; top: 0; left: 1px; right: 1px; padding: 4px 4px; z-index: 3; pointer-events: none; text-align: center; overflow: hidden; border-radius: 4px; box-sizing: border-box; }
 .slot-time { font-size: 12px; font-weight: 700; display: block; line-height: 1.6; opacity: 0.9; white-space: nowrap; }
 .slot-main { font-size: 14px; font-weight: 800; display: block; line-height: 1.5; white-space: nowrap; }
 .slot-sub { font-size: 12px; font-weight: 700; display: block; opacity: 0.85; line-height: 1.5; white-space: nowrap; }
@@ -187,6 +187,9 @@ td.slot.dragging { opacity: 0.4; }
 .b-vip { background: #fff2cc; color: #7a5c00; }
 .b-good { background: #daeeff; color: #1a4a6e; }
 .b-normal { background: #f0f0eb; color: #777; }
+.b-blacklist { background: #FFD6D6; color: #7a1a1a; }
+.row-blacklist td { background: #fff5f5 !important; }
+.row-blacklist td:first-child { border-left: 3px solid #e74c3c; }
 .b-screen { background: #daeeff; color: #1a4a6e; }
 .b-park { background: #c8edcc; color: #1a4d22; }
 .b-both { background: #e8e1f5; color: #4b2b6b; }
@@ -298,6 +301,7 @@ td.slot.dragging { opacity: 0.4; }
     <select id="gradeFilter" onchange="filterMembers()">
       <option value="">전체 등급</option>
       <option value="VIP">VIP</option><option value="우수">우수</option><option value="일반">일반</option>
+      <option value="__blacklist__">⚠ 블랙리스트만</option>
     </select>
     <select id="sortFilter" onchange="filterMembers()">
       <option value="name">이름순</option>
@@ -407,6 +411,10 @@ td.slot.dragging { opacity: 0.4; }
       <div class="fg"><label>등급</label>
         <select id="fGrade"><option value="일반">일반</option><option value="우수">우수</option><option value="VIP">VIP</option></select>
       </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin:10px 0;padding:10px 12px;background:#fff5f5;border-radius:8px;border:1px solid #f5c6c6;">
+      <input type="checkbox" id="fBlacklist" style="width:18px;height:18px;cursor:pointer;accent-color:#c0392b;">
+      <label for="fBlacklist" style="margin:0;font-size:13px;font-weight:700;color:#c0392b;cursor:pointer;">⚠ 블랙리스트 지정 — 예약 시 붉은색으로 표시됩니다</label>
     </div>
     <div class="fg" style="margin-bottom:10px;"><label>메모 추가</label><textarea id="fMemo" rows="2" placeholder="특이사항 등..."></textarea></div>
     <div id="bookingAnalysis"></div>
@@ -527,8 +535,20 @@ const PALETTE_PARK = [
   {bg:'#C8EDCC',text:'#1a4d22'},{bg:'#B8E6BC',text:'#144018'},
   {bg:'#CBEDD0',text:'#1a4d22'},{bg:'#A8DFB0',text:'#0f3314'},{bg:'#D4F0D8',text:'#1a4d22'},
 ];
-const paletteIdx = { screen: 0, park: 0 };
-function nextPalette(type) {
+const PALETTE_BLACKLIST = [
+  {bg:'#FFD6D6',text:'#7a1a1a'},{bg:'#FFCACA',text:'#6b1414'},
+  {bg:'#FFD8D8',text:'#7a1a1a'},{bg:'#FFC8C8',text:'#6b1414'},{bg:'#FFE0E0',text:'#7a1a1a'},
+];
+const paletteIdx = { screen: 0, park: 0, blacklist: 0 };
+function isBlacklisted(name) {
+  return Object.values(membersDB).some(m => m.name === name && m.blacklist === true);
+}
+function nextPalette(type, name) {
+  if (name && isBlacklisted(name)) {
+    const p = PALETTE_BLACKLIST[paletteIdx.blacklist % PALETTE_BLACKLIST.length];
+    paletteIdx.blacklist++;
+    return p;
+  }
   const arr = type==='park' ? PALETTE_PARK : PALETTE_SCREEN;
   const p = arr[paletteIdx[type] % arr.length];
   paletteIdx[type]++;
@@ -908,13 +928,18 @@ function refreshTable(type){
     Array.from(row.cells).slice(1).forEach((td,bi)=>{
       const found=getAt(type,date,bi,time);
       if(found){
-        const b=found.b,p=b.palette||nextPalette(type);
+        const b=found.b;
+        const bl=isBlacklisted(b.name);
+        const p=(b.palette&&!bl)?b.palette:nextPalette(type,b.name);
+        if(bl) b.palette=p; // 블랙리스트는 항상 붉은 팔레트
         td.className='slot booked'; td.style.background=p.bg; td.style.borderColor='rgba(0,0,0,0.08)';
         const isStart=(time===b.start),duration=si(b.end)-si(b.start),totalHeight=duration*22;
         if(isStart){
           td.style.overflow='visible'; td.style.position='relative'; td.style.zIndex='3';
           const memoLine=b.note?`<span class="slot-memo" style="color:${p.text}">📝 ${b.note}</span>`:'';
-          td.innerHTML=`<div class="slot-content" style="height:${totalHeight}px;background:${p.bg};border:1.5px solid rgba(0,0,0,0.45);border-radius:4px;pointer-events:none;">
+          const blLabel=bl?`<span style="font-size:10px;font-weight:800;color:#c0392b;">⚠ 블랙리스트</span>`:'';
+          td.innerHTML=`<div class="slot-content" style="height:${totalHeight}px;background:${p.bg};border:1.5px solid ${bl?'rgba(180,0,0,0.5)':'rgba(0,0,0,0.45)'};border-radius:4px;pointer-events:none;">
+            ${blLabel}
             <span class="slot-time" style="color:${p.text}">${b.start} ~ ${b.end}</span>
             <span class="slot-main" style="color:${p.text}">${b.name} ${b.people}명</span>
             <span class="slot-sub" style="color:${p.text}">${b.hole||''}</span>${memoLine}</div>`;
@@ -1115,7 +1140,12 @@ function filterMembers(){
   const q=document.getElementById('searchInput').value.toLowerCase();
   const gr=document.getElementById('gradeFilter').value;
   const so=document.getElementById('sortFilter').value;
-  let list=Object.values(membersDB).filter(m=>(!q||m.name.includes(q)||( m.phone&&m.phone.includes(q)))&&(!gr||m.grade===gr));
+  let list=Object.values(membersDB).filter(m=>{
+    if(!q && !gr) return true;
+    const matchQ=!q||(m.name&&m.name.includes(q))||(m.phone&&m.phone.includes(q));
+    const matchGr=!gr||(gr==='__blacklist__'?m.blacklist===true:m.grade===gr);
+    return matchQ&&matchGr;
+  });
 
   list.forEach(m=>{m._visits=getMemberVisits(m.name);m._last=getLastVisit(m.name)||m.joinDate;});
   if(so==='visits') list.sort((a,b)=>b._visits-a._visits);
@@ -1128,14 +1158,19 @@ function filterMembers(){
   list.forEach(m=>{
     const d=daysSince(m._last);
     const ls=d===0?'오늘':d===1?'어제':`${d}일 전`;
+    const bl=m.blacklist===true;
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td style="font-weight:800;">${m.name}</td>
+    if(bl) tr.className='row-blacklist';
+    const gradeHtml=bl
+      ?'<span class="badge b-blacklist">⚠ 블랙리스트</span>'
+      :`<span class="badge ${gc(m.grade)}">${m.grade}</span>`;
+    tr.innerHTML=`<td style="font-weight:800;${bl?'color:#c0392b;':''}">${m.name}</td>
       <td style="color:var(--muted)">${m.phone||'-'}</td>
       <td style="color:var(--muted)">${m.car||'-'}</td>
       <td><span class="vdot ${dotC(m._last)}"></span>${ls}</td>
       <td style="font-weight:800;">${m._visits}회</td>
       <td>${analysisTags(m.name)}</td>
-      <td><span class="badge ${gc(m.grade)}">${m.grade}</span></td>`;
+      <td>${gradeHtml}</td>`;
     tr.addEventListener('click',()=>openEditMemberModal(m.id));
     tr.addEventListener('mouseenter',e=>showTip(e,m));
     tr.addEventListener('mousemove',moveTip);
@@ -1170,6 +1205,7 @@ function openAddMemberModal(){
   document.getElementById('memberModalTitle').textContent='회원 추가';
   ['fName','fPhone','fCar','fMemo'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fGrade').value='일반';
+  document.getElementById('fBlacklist').checked=false;
   document.getElementById('existingMemos').style.display='none';
   document.getElementById('bookingAnalysis').innerHTML='';
   document.getElementById('btnDelMember').style.display='none';
@@ -1183,6 +1219,7 @@ function openEditMemberModal(id){
   document.getElementById('fPhone').value=m.phone||'';
   document.getElementById('fCar').value=m.car||'';
   document.getElementById('fGrade').value=m.grade||'일반';
+  document.getElementById('fBlacklist').checked=m.blacklist===true;
   document.getElementById('fMemo').value='';
   document.getElementById('btnDelMember').style.display='block';
   document.getElementById('bookingAnalysis').innerHTML=analysisBoxHTML(m.name);
@@ -1200,20 +1237,24 @@ function saveMember(){
   const name=document.getElementById('fName').value.trim();
   if(!name){document.getElementById('fName').focus();return;}
   const memo=document.getElementById('fMemo').value.trim();
+  const blacklist=document.getElementById('fBlacklist').checked;
   const today=toDateStr(new Date());
   if(editingMemberId){
     const m=membersDB[editingMemberId];
     m.name=name; m.phone=document.getElementById('fPhone').value.trim();
     m.car=document.getElementById('fCar').value.trim(); m.grade=document.getElementById('fGrade').value;
+    m.blacklist=blacklist;
     if(memo){if(!m.memos)m.memos=[];m.memos.push({date:today,text:memo});}
     if(window.fbSaveMember) window.fbSaveMember(editingMemberId,m);
   } else {
     const id='m_'+Date.now();
-    const newMember={id,name,phone:document.getElementById('fPhone').value.trim(),car:document.getElementById('fCar').value.trim(),grade:document.getElementById('fGrade').value,joinDate:today,memos:memo?[{date:today,text:memo}]:[]};
+    const newMember={id,name,phone:document.getElementById('fPhone').value.trim(),car:document.getElementById('fCar').value.trim(),grade:document.getElementById('fGrade').value,blacklist,joinDate:today,memos:memo?[{date:today,text:memo}]:[]};
     membersDB[id]=newMember;
     if(window.fbSaveMember) window.fbSaveMember(id,newMember);
   }
   closeMemberModal(); filterMembers();
+  // 블랙리스트 변경 시 예약표도 갱신
+  BOARDS.forEach(cfg=>refreshTable(cfg.type));
 }
 function deleteMember(){
   if(!confirm('정말 삭제하시겠습니까?')) return;
