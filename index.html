@@ -501,7 +501,7 @@ td.slot.dragging { opacity: 0.4; }
 <!-- Firebase SDK (module) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, set, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDWHBf0wUme5xbbxD8ShjH341ZWYEYHvBQ",
@@ -524,6 +524,15 @@ window.fbSave = function(type, key, data) {
 window.fbDelete = function(type, key) {
   const k = key.replace(/\./g,'_').replace(/__/g,'--');
   remove(ref(db, `bookings/${type}/${k}`)).catch(e => console.warn('FB 삭제 실패:', e));
+};
+// 예약 이동 — 삭제+추가를 atomic하게 처리 (race condition 방지)
+window.fbMove = function(type, oldKey, newKey, data) {
+  const ok = oldKey.replace(/\./g,'_').replace(/__/g,'--');
+  const nk = newKey.replace(/\./g,'_').replace(/__/g,'--');
+  const updates = {};
+  updates[`bookings/${type}/${ok}`] = null;
+  updates[`bookings/${type}/${nk}`] = {...data, _key: newKey};
+  return update(ref(db), updates).catch(e => console.warn('FB 이동 실패:', e));
 };
 
 // 회원 저장/삭제
@@ -933,9 +942,14 @@ document.addEventListener('mouseup',e=>{
   clearDragHighlights();
   if(drag.moved&&drag.preview){
     const {type,key,b}=drag,{bayIdx,start,end}=drag.preview;
-    saveToStorage(type,key,null); delete bookingsDB[type][key];
     const nk=bKey(b.date,bayIdx,start),nd={...b,bayIdx,start,end};
-    bookingsDB[type][nk]=nd; saveToStorage(type,nk,nd);
+    // 로컬 상태 업데이트
+    delete bookingsDB[type][key];
+    bookingsDB[type][nk]=nd;
+    // Firebase atomic move (삭제+추가 한번에)
+    if(window.fbMove) window.fbMove(type,key,nk,nd);
+    document.getElementById('syncStatus').textContent='↑ 저장 중...';
+    document.getElementById('syncStatus').style.color='#888';
     refreshTable(type); renderCal(type);
     drag=null;
   } else if(drag.moved){
@@ -981,9 +995,12 @@ function onTED(e){
   clearDragHighlights();
   if(drag.moved&&drag.preview){
     const {type,key,b}=drag,{bayIdx,start,end}=drag.preview;
-    saveToStorage(type,key,null); delete bookingsDB[type][key];
     const nk=bKey(b.date,bayIdx,start),nd={...b,bayIdx,start,end};
-    bookingsDB[type][nk]=nd; saveToStorage(type,nk,nd);
+    delete bookingsDB[type][key];
+    bookingsDB[type][nk]=nd;
+    if(window.fbMove) window.fbMove(type,key,nk,nd);
+    document.getElementById('syncStatus').textContent='↑ 저장 중...';
+    document.getElementById('syncStatus').style.color='#888';
     refreshTable(type); renderCal(type);
   } else {document.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'));refreshTable(drag.type);}
   drag=null;
@@ -1135,10 +1152,20 @@ document.getElementById('mSave').addEventListener('click',()=>{
   errEl.style.display='none';
   if(manager){addToManagerList(manager);saveManager(manager);}
   const palette=(editKey&&bookingsDB[type][editKey])?bookingsDB[type][editKey].palette:nextPalette(type,name);
-  if(editKey){saveToStorage(type,editKey,null);delete bookingsDB[type][editKey];}
   const nk=bKey(date,bayIdx,start);
   const nd={date,bayIdx,start,end,name,phone,people:document.getElementById('mPeople').value,hole,manager,note:document.getElementById('mNote').value.trim(),palette};
-  bookingsDB[type][nk]=nd; saveToStorage(type,nk,nd);
+  if(editKey && editKey !== nk){
+    // 키가 바뀌는 경우 — atomic move (race condition 방지)
+    delete bookingsDB[type][editKey];
+    bookingsDB[type][nk]=nd;
+    if(window.fbMove) window.fbMove(type,editKey,nk,nd);
+    document.getElementById('syncStatus').textContent='↑ 저장 중...';
+    document.getElementById('syncStatus').style.color='#888';
+  } else {
+    // 새 예약 또는 같은 키 수정
+    bookingsDB[type][nk]=nd;
+    saveToStorage(type,nk,nd);
+  }
   refreshTable(type); renderCal(type);
   document.getElementById('modalBg').classList.remove('open');
 });
