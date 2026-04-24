@@ -855,14 +855,12 @@ function highlightSelectPreview(){
 function clearSelectPreview(){document.querySelectorAll('.select-preview').forEach(el=>el.classList.remove('select-preview'));}
 
 function startDrag(e,type,key,b,originTd){
-  e.preventDefault();
+  // preventDefault 제거 — click 이벤트가 정상 발생하도록
   const duration=si(b.end)-si(b.start);
-  drag={type,key,b,duration,clickOffset:si(originTd.dataset.time)-si(b.start),originTd,moved:false,preview:null};
+  drag={type,key,b,duration,clickOffset:si(originTd.dataset.time)-si(b.start),originTd,moved:false,preview:null,startX:e.clientX,startY:e.clientY};
   const ghost=document.getElementById('dragGhost');
   ghost.textContent=`${b.name} (${b.people}명)`;
-  ghost.style.display='block'; ghost.style.left=(e.clientX+12)+'px'; ghost.style.top=(e.clientY-16)+'px';
-  originTd.classList.add('dragging');
-  getDragCells(type,b).forEach(td=>td.classList.add('dragging'));
+  ghost.style.display='none'; ghost.style.left=(e.clientX+12)+'px'; ghost.style.top=(e.clientY-16)+'px';
 }
 function getDragCells(type,b){
   const tbody=document.getElementById(`tbody_${type}`); if(!tbody) return [];
@@ -883,6 +881,15 @@ document.addEventListener('mousemove',e=>{
     return;
   }
   if(!drag) return;
+  // 미세한 움직임은 무시 (5px 이상 움직였을 때만 drag로 간주)
+  if(!drag.startX){drag.startX=e.clientX;drag.startY=e.clientY;}
+  const dx=Math.abs(e.clientX-drag.startX),dy=Math.abs(e.clientY-drag.startY);
+  if(dx<5&&dy<5) return;
+  if(!drag.moved){
+    // 처음 threshold 넘었을 때 dragging 스타일 적용
+    drag.originTd.classList.add('dragging');
+    getDragCells(drag.type,drag.b).forEach(td=>td.classList.add('dragging'));
+  }
   drag.moved=true;
   const ghost=document.getElementById('dragGhost');
   ghost.style.left=(e.clientX+12)+'px'; ghost.style.top=(e.clientY-16)+'px';
@@ -930,8 +937,18 @@ document.addEventListener('mouseup',e=>{
     const nk=bKey(b.date,bayIdx,start),nd={...b,bayIdx,start,end};
     bookingsDB[type][nk]=nd; saveToStorage(type,nk,nd);
     refreshTable(type); renderCal(type);
-  } else {document.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'));refreshTable(drag.type);}
-  drag=null;
+    drag=null;
+  } else if(drag.moved){
+    // 움직였지만 유효한 위치가 아닐 때만 새로고침
+    document.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'));
+    refreshTable(drag.type);
+    drag=null;
+  } else {
+    // 움직이지 않았으면 단순 클릭 — refreshTable 호출 안함 (click 이벤트 보존)
+    document.querySelectorAll('.dragging').forEach(el=>el.classList.remove('dragging'));
+    // drag는 click 핸들러가 처리한 후 정리되도록 setTimeout
+    setTimeout(()=>{drag=null;},0);
+  }
 });
 
 // Touch drag
@@ -1117,7 +1134,7 @@ document.getElementById('mSave').addEventListener('click',()=>{
   if(hasConflict(type,date,bayIdx,start,end,editKey)){errEl.textContent='해당 시간대에 이미 예약이 있습니다. (ERR: 예약 중복)';errEl.style.display='block';return;}
   errEl.style.display='none';
   if(manager){addToManagerList(manager);saveManager(manager);}
-  const palette=(editKey&&bookingsDB[type][editKey])?bookingsDB[type][editKey].palette:nextPalette(type);
+  const palette=(editKey&&bookingsDB[type][editKey])?bookingsDB[type][editKey].palette:nextPalette(type,name);
   if(editKey){saveToStorage(type,editKey,null);delete bookingsDB[type][editKey];}
   const nk=bKey(date,bayIdx,start);
   const nd={date,bayIdx,start,end,name,phone,people:document.getElementById('mPeople').value,hole,manager,note:document.getElementById('mNote').value.trim(),palette};
@@ -1419,8 +1436,9 @@ function saveCompanions(myId){
   membersDB[myId].companions=[...currentCompanions];
 }
 
-// 드롭다운 외부 클릭 시 닫기
+// 드롭다운 외부 클릭 시 닫기 (회원 모달 열려있을 때만)
 document.addEventListener('click',e=>{
+  if(!document.getElementById('memberModalBg').classList.contains('open')) return;
   if(!e.target.closest('#companionSearch')&&!e.target.closest('#companionDropdown'))
     document.getElementById('companionDropdown').style.display='none';
 });
