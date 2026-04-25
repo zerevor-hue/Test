@@ -579,6 +579,9 @@ td.slot.dragging { opacity: 0.4; }
         <div class="ds-sec-title">시간대별 혼잡도</div>
         <div class="ds-bar-chart" id="dsScreenTimes"></div>
 
+        <div class="ds-sec-title">평일 / 주말·공휴일</div>
+        <div class="ds-bar-chart" id="dsScreenWeekend"></div>
+
         <!-- 홀 단위 집계 -->
         <div class="ds-sec-title">홀 단위 집계</div>
         <div class="ds-chip-row" id="dsScreenHoles"></div>
@@ -602,6 +605,9 @@ td.slot.dragging { opacity: 0.4; }
 
         <div class="ds-sec-title">시간대별 혼잡도</div>
         <div class="ds-bar-chart" id="dsParkTimes"></div>
+
+        <div class="ds-sec-title">평일 / 주말·공휴일</div>
+        <div class="ds-bar-chart" id="dsParkWeekend"></div>
 
         <div class="ds-sec-title">홀 단위 집계</div>
         <div class="ds-chip-row" id="dsParkHoles"></div>
@@ -708,7 +714,6 @@ td.slot.dragging { opacity: 0.4; }
         <option value="important">🟡 중요</option>
         <option value="urgent">🔴 긴급</option>
       </select>
-      <input type="date" id="todoDeadline" title="마감일 (선택)" style="padding:9px 10px;border:0.5px solid var(--border-md);border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;">
       <button class="btn primary" onclick="addTodo()">+ 추가</button>
     </div>
   </div>
@@ -721,10 +726,10 @@ td.slot.dragging { opacity: 0.4; }
     <button onclick="clearTodoSelection()" style="padding:6px 12px;background:transparent;color:#fff;border:1px solid #555;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;margin-left:auto;">선택 해제</button>
   </div>
 
-  <!-- 미완료 -->
+  <!-- 인계사항(미완료) -->
   <div class="card" style="padding:14px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-      <div style="font-size:14px;font-weight:800;">진행 중 <span id="todoActiveCount" style="color:var(--muted);font-weight:700;">(0)</span></div>
+      <div style="font-size:14px;font-weight:800;">인계사항 <span id="todoActiveCount" style="color:var(--muted);font-weight:700;">(0)</span></div>
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;">
         <input type="checkbox" id="todoSortPriority" onchange="renderTodos()" style="cursor:pointer;"> 중요도 순으로 정렬
       </label>
@@ -771,16 +776,6 @@ td.slot.dragging { opacity: 0.4; }
   <div class="modal">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <h3 id="mTitle" style="margin-bottom:0;">예약 입력</h3>
-      <div style="display:flex;align-items:center;gap:6px;">
-        <label style="margin:0;font-size:12px;font-weight:700;color:var(--muted);">담당자</label>
-        <select id="mManager" style="width:auto;padding:6px 8px;font-size:13px;font-weight:700;">
-          <option value="">선택</option>
-          <option value="__new__">+ 직접 입력</option>
-        </select>
-      </div>
-    </div>
-    <div id="mManagerCustomWrap" style="display:none;margin-bottom:10px;">
-      <input type="text" id="mManagerCustom" placeholder="담당자 이름 입력 후 Enter" style="font-size:13px;"/>
     </div>
     <label>날짜</label><input type="date" id="mDate"/>
     <label id="mBayLabel">방</label><select id="mBay"></select>
@@ -906,6 +901,9 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
+// 전역 참조 저장 (메인 스크립트에서 접근)
+window._fbDb = db;
+window._fbRefs = { ref, set, remove, update };
 
 // ── Pending Writes 추적 ──
 // 로컬에서 쓰기가 진행 중인 항목을 기록 → onValue가 중간 상태로 덮어쓰지 않도록 보호
@@ -1231,6 +1229,27 @@ onValue(ref(db, 'shifts'), snapshot => {
   if (typeof renderBigCalendar === 'function') renderBigCalendar();
 });
 
+// ── 근무자 명단 Firebase 동기화 ──
+onValue(ref(db, 'managerList'), snapshot => {
+  const data = snapshot.val();
+  if (data && typeof data === 'object') {
+    const list = Object.values(data).filter(Boolean);
+    if (list.length > 0) {
+      managerListDB = list;
+      // localStorage에도 동기화
+      try { localStorage.setItem('golf_manager_list_v1', JSON.stringify(list)); } catch(e){}
+    }
+  }
+  // 상단 근무자 드롭다운 갱신
+  if (typeof rebuildGlobalManagerSelect === 'function') {
+    rebuildGlobalManagerSelect(typeof getGlobalManager === 'function' ? getGlobalManager() : '');
+  }
+  if (typeof renderWorkStaffPicks === 'function') {
+    const bar = document.getElementById('workEditBar');
+    if (bar && bar.style.display !== 'none') renderWorkStaffPicks();
+  }
+});
+
 // ── 근무자 색상 (Firebase 저장 — 모든 기기 공유) ──
 window.fbSaveStaffColor = function(name, color) {
   return set(ref(db, `staffColors/${name}`), color).catch(e => console.warn('근무자 색상 저장 실패:', e));
@@ -1239,8 +1258,9 @@ onValue(ref(db, 'staffColors'), snapshot => {
   const data = snapshot.val();
   staffColorsDB = data || {};
   if (typeof renderBigCalendar === 'function') renderBigCalendar();
-  if (typeof renderWorkStaffPicks === 'function' && document.getElementById('workEditBar')?.style.display !== 'none') {
-    renderWorkStaffPicks();
+  if (typeof renderWorkStaffPicks === 'function') {
+    const bar = document.getElementById('workEditBar');
+    if (bar && bar.style.display !== 'none') renderWorkStaffPicks();
   }
 });
 </script>
@@ -1295,15 +1315,39 @@ const LS_MANAGER_KEY = 'golf_last_manager_v1';
 const LS_MANAGER_LIST_KEY = 'golf_manager_list_v1';
 function getSavedManager() { try { return localStorage.getItem(LS_MANAGER_KEY)||''; } catch(e) { return ''; } }
 function saveManager(v) { try { localStorage.setItem(LS_MANAGER_KEY,v); } catch(e) {} }
-function getManagerList() { try { return JSON.parse(localStorage.getItem(LS_MANAGER_LIST_KEY)||'[]'); } catch(e) { return []; } }
-function addToManagerList(n) { if(!n) return; const l=getManagerList(); if(!l.includes(n)){l.push(n);localStorage.setItem(LS_MANAGER_LIST_KEY,JSON.stringify(l));} }
+
+// 근무자 명단 — Firebase 기반 (기기 간 공유)
+let managerListDB = [];
+window.fbSaveManagerList = function(list) {
+  // 배열을 객체로 변환해서 저장 (Firebase는 배열 인덱스 보존이 불안정)
+  const obj = {};
+  list.forEach((n,i) => { obj['m'+i] = n; });
+  if(window._fbDb) {
+    const {ref, set} = window._fbRefs;
+    set(ref(window._fbDb, 'managerList'), obj).catch(e => console.warn('근무자 저장 실패:', e));
+  }
+};
+function getManagerList() {
+  // Firebase 데이터 우선, 없으면 localStorage fallback
+  if(managerListDB.length > 0) return [...managerListDB];
+  try { return JSON.parse(localStorage.getItem(LS_MANAGER_LIST_KEY)||'[]'); } catch(e) { return []; }
+}
+function addToManagerList(n) {
+  if(!n) return;
+  if(!managerListDB.includes(n)){
+    managerListDB.push(n);
+    if(window.fbSaveManagerList) window.fbSaveManagerList(managerListDB);
+    // localStorage에도 fallback 저장
+    try { localStorage.setItem(LS_MANAGER_LIST_KEY, JSON.stringify(managerListDB)); } catch(e){}
+  }
+}
+function removeFromManagerList(n) {
+  managerListDB = managerListDB.filter(x => x !== n);
+  if(window.fbSaveManagerList) window.fbSaveManagerList(managerListDB);
+  try { localStorage.setItem(LS_MANAGER_LIST_KEY, JSON.stringify(managerListDB)); } catch(e){}
+}
 function rebuildManagerSelect(sel) {
-  const el=document.getElementById('mManager');
-  const list=getManagerList();
-  el.innerHTML='<option value="">선택</option>';
-  list.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;el.appendChild(o);});
-  const a=document.createElement('option');a.value='__new__';a.textContent='+ 직접 입력';el.appendChild(a);
-  el.value=(sel&&list.includes(sel))?sel:'';
+  // 예약 모달의 담당자 select — 삭제됨. 하위호환만 유지
 }
 
 const bookingsDB = { screen:{}, park:{} };
@@ -1583,7 +1627,13 @@ function showTipForBooking(e,b){
 
   // 예약 기본 정보
   let html=`<div class="t-name">📅 ${b.start} ~ ${b.end}</div>
-    <div style="font-size:11px;opacity:0.85;margin-bottom:6px;">${b.people}명 · ${parseInt(b.games||1)>1?(b.games+'게임 · '):''}${b.hole||''}${b.manager?' · 담당 '+b.manager:''}</div>`;
+    <div style="font-size:11px;opacity:0.85;margin-bottom:4px;">${b.people}명 · ${parseInt(b.games||1)>1?(b.games+'게임 · '):''}${b.hole||''}</div>`;
+  // 예약자(근무자) + 예약일시
+  if(b.bookedBy||b.manager){
+    const who=b.bookedBy||b.manager;
+    const when=b.bookedAt?` · ${fmtDateTime(b.bookedAt)}`:'';
+    html+=`<div style="font-size:11px;opacity:0.8;margin-bottom:4px;">예약자: ${who}${when}</div>`;
+  }
   if(b.note) html+=`<div style="font-size:11px;opacity:0.75;margin-bottom:6px;">📝 ${b.note}</div>`;
 
   // 각 예약자 회원 정보
@@ -1601,9 +1651,12 @@ function showTipForBooking(e,b){
       // 방문 횟수
       const visits=getMemberVisits(m.name);
       html+=`<div style="font-size:11px;opacity:0.85;">📊 총 예약 ${visits}회</div>`;
-      // 일행
-      const companions=(m.companions||[]).map(cid=>membersDB[cid]?.name).filter(Boolean);
-      if(companions.length) html+=`<div style="font-size:11px;opacity:0.85;">👥 일행: ${companions.join(', ')}</div>`;
+      // 일행 (이름 + 차량번호)
+      const companionInfos=(m.companions||[]).map(cid=>{
+        const cm=membersDB[cid]; if(!cm) return null;
+        return cm.car?`${cm.name} (${cm.car})`:cm.name;
+      }).filter(Boolean);
+      if(companionInfos.length) html+=`<div style="font-size:11px;opacity:0.85;">👥 일행: ${companionInfos.join(', ')}</div>`;
       // 최근 메모
       if(m.memos&&m.memos.length) html+=`<div style="font-size:11px;opacity:0.7;margin-top:2px;">💬 ${m.memos[m.memos.length-1].text}</div>`;
     }
@@ -1820,11 +1873,13 @@ function refreshTable(type){
           const holeSpan=hole
             ? `<span style="color:${isStandard?p.text:'#c0392b'};font-weight:${isStandard?'700':'800'};">${hole}</span>`
             : '';
+          const games=parseInt(b.games||1);
+          const gamesSpan=games>1?`<span style="color:#c0392b;font-weight:800;">${games}게임</span> `:'';
           td.innerHTML=`<div class="slot-content" style="height:${totalHeight}px;background:${p.bg};border:1.5px solid ${bl?'rgba(180,0,0,0.5)':'rgba(0,0,0,0.45)'};border-radius:4px;pointer-events:none;">
             ${blLabel}
             <span class="slot-time" style="color:${p.text}">${b.start} ~ ${b.end}</span>
             ${nameLines}
-            <span class="slot-sub" style="color:${p.text}">${b.people}명 ${parseInt(b.games||1)>1?(b.games+'게임 '):''}${holeSpan}</span>${memoLine}</div>`;
+            <span class="slot-sub" style="color:${p.text}">${b.people}명 ${gamesSpan}${holeSpan}</span>${memoLine}</div>`;
         } else {td.style.overflow='visible';td.style.position='relative';td.innerHTML='';}
       } else {td.className='slot empty';td.style.cssText='';td.innerHTML='';}
     });
@@ -1921,14 +1976,14 @@ function renderSummaryCol(type,date,bayNames){
     }).join('');
   }
 
-  // 3. 시간대별 혼잡도
-  const timeBuckets={'오전\n(~12시)':0,'오후\n(12~17시)':0,'저녁\n(17~20시)':0,'야간\n(20시~)':0};
+  // 3. 시간대별 혼잡도 (4구간)
+  const timeBuckets={'09~12시':0,'12~15시':0,'15~18시':0,'18~22시':0};
   bookings.forEach(b=>{
     const h=parseInt(b.start.split(':')[0]);
-    if(h<12) timeBuckets['오전\n(~12시)']++;
-    else if(h<17) timeBuckets['오후\n(12~17시)']++;
-    else if(h<20) timeBuckets['저녁\n(17~20시)']++;
-    else timeBuckets['야간\n(20시~)']++;
+    if(h>=9&&h<12) timeBuckets['09~12시']++;
+    else if(h>=12&&h<15) timeBuckets['12~15시']++;
+    else if(h>=15&&h<18) timeBuckets['15~18시']++;
+    else if(h>=18&&h<22) timeBuckets['18~22시']++;
   });
   const maxTime=Math.max(...Object.values(timeBuckets),1);
   const timeEl=document.getElementById(prefix+'Times');
@@ -1937,13 +1992,38 @@ function renderSummaryCol(type,date,bayNames){
   } else {
     timeEl.innerHTML=Object.entries(timeBuckets).map(([k,v])=>{
       const w=Math.round(v/maxTime*100);
-      const label=k.split('\n')[0]; // 간단히 표시
       return `<div class="ds-bar-row">
-        <span class="ds-bar-label">${label}</span>
+        <span class="ds-bar-label">${k}</span>
         <div class="ds-bar-track"><div class="ds-bar-fill" style="width:${w}%"></div></div>
         <span class="ds-bar-count">${v}건</span>
       </div>`;
     }).join('');
+  }
+
+  // 3-b. 평일/주말(공휴일 포함) 분류
+  const hMap=getHolidayMap(new Date(date).getFullYear());
+  let weekdayCnt=0,weekendCnt=0;
+  bookings.forEach(b=>{
+    const dow=new Date(b.date).getDay();
+    const isWE=(dow===0||dow===6||!!hMap[b.date]);
+    if(isWE) weekendCnt++; else weekdayCnt++;
+  });
+  const wEl=document.getElementById(prefix+'Weekend');
+  if(wEl){
+    const tot=weekdayCnt+weekendCnt||1;
+    const wdW=Math.round(weekdayCnt/tot*100);
+    const weW=Math.round(weekendCnt/tot*100);
+    wEl.innerHTML=bookingCount===0?'<div class="ds-empty">예약 없음</div>':`
+      <div class="ds-bar-row">
+        <span class="ds-bar-label">평일</span>
+        <div class="ds-bar-track"><div class="ds-bar-fill" style="width:${wdW}%"></div></div>
+        <span class="ds-bar-count">${weekdayCnt}건</span>
+      </div>
+      <div class="ds-bar-row">
+        <span class="ds-bar-label">주말·공휴일</span>
+        <div class="ds-bar-track"><div class="ds-bar-fill" style="width:${weW}%"></div></div>
+        <span class="ds-bar-count">${weekendCnt}건</span>
+      </div>`;
   }
 
   // 4. 홀 단위 집계
@@ -2158,15 +2238,12 @@ function openModal(type,bayIdx,time,bayName){
   document.getElementById('mGames').value=b?(b.games||'1'):'1';
   document.getElementById('mHole').value=b?(b.hole||'18홀'):'18홀';
   document.getElementById('mNote').value=b?(b.note||''):'';
-  rebuildManagerSelect(b?(b.manager||''):getSavedManager());
-  document.getElementById('mManagerCustomWrap').style.display='none';
   document.getElementById('mDelete').style.display=b?'block':'none';
   document.getElementById('modalBg').classList.add('open');
   setTimeout(()=>document.getElementById('mName').focus(),50);
 }
 function openModalForNew(type,bayIdx,start,end){
   const cfg=BOARDS.find(c=>c.type===type);
-  // autoEnd: false — 사용자가 드래그로 직접 범위 지정한 거라 자동 변경 X
   modalState={type,editKey:null,lastStart:start,autoEnd:false};
   document.getElementById('mTitle').textContent='예약 입력';
   document.getElementById('mBayLabel').textContent=type==='park'?'타석':'방';
@@ -2182,20 +2259,10 @@ function openModalForNew(type,bayIdx,start,end){
   document.getElementById('mGames').value='1';
   document.getElementById('mHole').value='18홀';
   document.getElementById('mNote').value='';
-  rebuildManagerSelect(getSavedManager());
-  document.getElementById('mManagerCustomWrap').style.display='none';
   document.getElementById('mDelete').style.display='none';
   document.getElementById('modalBg').classList.add('open');
   setTimeout(()=>document.getElementById('mName').focus(),50);
 }
-
-document.getElementById('mManager').addEventListener('change',function(){
-  if(this.value==='__new__'){document.getElementById('mManagerCustomWrap').style.display='block';setTimeout(()=>document.getElementById('mManagerCustom').focus(),30);}
-  else{document.getElementById('mManagerCustomWrap').style.display='none';document.getElementById('mManagerCustom').value='';if(this.value)saveManager(this.value);}
-});
-document.getElementById('mManagerCustom').addEventListener('keydown',function(e){
-  if(e.key==='Enter'){const n=this.value.trim();if(!n)return;addToManagerList(n);saveManager(n);rebuildManagerSelect(n);document.getElementById('mManagerCustomWrap').style.display='none';this.value='';}
-});
 
 // 엔터키로 저장 (textarea, 직접입력란 제외)
 document.getElementById('modalBg').addEventListener('keydown',function(e){
@@ -2216,17 +2283,19 @@ document.getElementById('mSave').addEventListener('click',()=>{
   const bayIdx=parseInt(document.getElementById('mBay').value);
   const start=document.getElementById('mStart').value,end=document.getElementById('mEnd').value;
   const hole=document.getElementById('mHole').value;
-  const mgrSel=document.getElementById('mManager');
-  const manager=mgrSel.value==='__new__'?document.getElementById('mManagerCustom').value.trim():mgrSel.value;
+  const manager=getGlobalManager(); // 글로벌 근무자 자동 사용
   const errEl=document.getElementById('mErr');
   if(si(end)<=si(start)){errEl.textContent='종료 시간은 시작 시간 이후여야 합니다.';errEl.style.display='block';return;}
   if(!name){document.getElementById('mName').focus();return;}
   if(hasConflict(type,date,bayIdx,start,end,editKey)){errEl.textContent='해당 시간대에 이미 예약이 있습니다. (ERR: 예약 중복)';errEl.style.display='block';return;}
   errEl.style.display='none';
-  if(manager){addToManagerList(manager);saveManager(manager);}
   const palette=(editKey&&bookingsDB[type][editKey])?bookingsDB[type][editKey].palette:nextPalette(type,name);
   const nk=bKey(date,bayIdx,start);
-  const nd={date,bayIdx,start,end,name,phone,people:document.getElementById('mPeople').value,games:document.getElementById('mGames').value,hole,manager,note:document.getElementById('mNote').value.trim(),palette};
+  // 기존 예약 수정 시 원래 bookedBy/bookedAt 유지
+  const existing=editKey?bookingsDB[type][editKey]:{};
+  const bookedBy=existing.bookedBy||manager||'';
+  const bookedAt=existing.bookedAt||new Date().toISOString();
+  const nd={date,bayIdx,start,end,name,phone,people:document.getElementById('mPeople').value,games:document.getElementById('mGames').value,hole,manager,bookedBy,bookedAt,note:document.getElementById('mNote').value.trim(),palette};
   if(editKey && editKey !== nk){
     // 키가 바뀌는 경우 — atomic move (race condition 방지)
     delete bookingsDB[type][editKey];
@@ -2669,6 +2738,7 @@ function rebuildGlobalManagerSelect(sel){
   el.innerHTML='<option value="">선택</option>';
   list.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;el.appendChild(o);});
   const a=document.createElement('option');a.value='__new__';a.textContent='+ 직접 입력';el.appendChild(a);
+  const d=document.createElement('option');d.value='__delete__';d.textContent='🗑️ 근무자 삭제';el.appendChild(d);
   el.value=(sel&&list.includes(sel))?sel:'';
 }
 function onGlobalManagerChange(){
@@ -2677,14 +2747,55 @@ function onGlobalManagerChange(){
   if(el.value==='__new__'){
     cw.style.display='inline-block';
     setTimeout(()=>cw.focus(),30);
+  } else if(el.value==='__delete__'){
+    el.value=getGlobalManager()||'';
+    const list=getManagerList();
+    if(!list.length){alert('삭제할 근무자가 없습니다.'); return;}
+    // 팝업으로 삭제할 근무자 선택
+    openManagerDeleteModal();
   } else {
     cw.style.display='none';
     cw.value='';
     if(el.value){
       setGlobalManager(el.value);
-      saveManager(el.value); // 예약 입력 모달용 호환
+      saveManager(el.value);
     }
   }
+}
+function openManagerDeleteModal(){
+  const list=getManagerList();
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:3000;display:flex;align-items:center;justify-content:center;padding:12px;';
+  overlay.onclick=(e)=>{if(e.target===overlay)overlay.remove();};
+  const box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:14px;padding:20px;max-width:320px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.2);';
+  box.innerHTML='<h3 style="font-size:15px;font-weight:800;margin-bottom:12px;">🗑️ 근무자 삭제</h3>';
+  list.forEach(name=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid #eee;';
+    const col=getStaffColor(name);
+    row.innerHTML=`<span style="font-weight:700;"><span style="display:inline-block;width:12px;height:12px;border-radius:6px;background:${col};margin-right:6px;vertical-align:middle;"></span>${name}</span>`;
+    const btn=document.createElement('button');
+    btn.textContent='삭제';
+    btn.style.cssText='padding:4px 10px;background:#c0392b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;';
+    btn.onclick=()=>{
+      if(!confirm(`"${name}" 근무자를 삭제하시겠습니까?\n(배정된 근무 일정은 유지됩니다)`)) return;
+      removeFromManagerList(name);
+      rebuildGlobalManagerSelect(getGlobalManager());
+      if(typeof renderWorkStaffPicks==='function') renderWorkStaffPicks();
+      overlay.remove();
+    };
+    row.appendChild(btn);
+    box.appendChild(row);
+  });
+  const closeBtn=document.createElement('button');
+  closeBtn.className='btn';
+  closeBtn.style.cssText='width:100%;margin-top:12px;';
+  closeBtn.textContent='닫기';
+  closeBtn.onclick=()=>overlay.remove();
+  box.appendChild(closeBtn);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
 }
 document.getElementById('globalManagerCustom').addEventListener('keydown',function(e){
   if(e.key==='Enter'){
@@ -2704,23 +2815,36 @@ let todosDB={};
 let todoSelection=new Set();
 let doneListExpanded=true;
 
+function fmtDateTime(iso){
+  if(!iso) return '';
+  const d=new Date(iso);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function fmtDate(s){
+  if(!s) return '';
+  const [y,m,d]=s.split('-');
+  return `${parseInt(m)}월 ${parseInt(d)}일`;
+}
+const PRIORITY_ORDER={urgent:0,important:1,normal:2};
+
 function addTodo(){
   const text=document.getElementById('todoInput').value.trim();
   if(!text){document.getElementById('todoInput').focus();return;}
   const priority=document.getElementById('todoPriority').value;
-  const deadline=document.getElementById('todoDeadline').value||null;
   const author=getGlobalManager();
   if(!author){alert('상단에서 근무자를 먼저 선택해주세요.');return;}
   const id='t_'+Date.now()+'_'+Math.floor(Math.random()*1000);
+  // order: 현재 미완료 항목 중 가장 낮은 순서 + 1
+  const maxOrder=Math.max(0,...Object.values(todosDB).filter(x=>!x.done).map(x=>x.order||0));
   const todo={
-    id, text, priority, deadline,
+    id, text, priority,
     author, createdAt: new Date().toISOString(),
-    done: false, doneBy: '', doneAt: ''
+    done: false, doneBy: '', doneAt: '',
+    order: maxOrder+1
   };
   todosDB[id]=todo;
   if(window.fbSaveTodo) window.fbSaveTodo(id,todo);
   document.getElementById('todoInput').value='';
-  document.getElementById('todoDeadline').value=toDateStr(new Date());
   document.getElementById('todoPriority').value='normal';
   renderTodos();
 }
@@ -2739,6 +2863,36 @@ function toggleTodo(id){
     t.done=false; t.doneBy=''; t.doneAt='';
   }
   if(window.fbSaveTodo) window.fbSaveTodo(t.id,t);
+  renderTodos();
+}
+
+function editTodo(id){
+  const t=todosDB[id]; if(!t||t.done) return;
+  const newText=prompt('인계사항 수정:', t.text);
+  if(newText===null) return;
+  const trimmed=newText.trim();
+  if(!trimmed){alert('내용을 입력해주세요.'); return;}
+  t.text=trimmed;
+  if(window.fbSaveTodo) window.fbSaveTodo(t.id,t);
+  renderTodos();
+}
+
+function moveTodoUp(id){
+  const active=Object.values(todosDB).filter(x=>!x.done).sort((a,b)=>(a.order||0)-(b.order||0));
+  const idx=active.findIndex(x=>x.id===id);
+  if(idx<=0) return;
+  const a=active[idx],b=active[idx-1];
+  const tmp=a.order||idx; a.order=b.order||(idx-1); b.order=tmp;
+  if(window.fbSaveTodo){window.fbSaveTodo(a.id,a);window.fbSaveTodo(b.id,b);}
+  renderTodos();
+}
+function moveTodoDown(id){
+  const active=Object.values(todosDB).filter(x=>!x.done).sort((a,b)=>(a.order||0)-(b.order||0));
+  const idx=active.findIndex(x=>x.id===id);
+  if(idx<0||idx>=active.length-1) return;
+  const a=active[idx],b=active[idx+1];
+  const tmp=a.order||idx; a.order=b.order||(idx+1); b.order=tmp;
+  if(window.fbSaveTodo){window.fbSaveTodo(a.id,a);window.fbSaveTodo(b.id,b);}
   renderTodos();
 }
 
@@ -2788,87 +2942,74 @@ function toggleDoneList(){
   document.getElementById('toggleDoneBtn').textContent=doneListExpanded?'접기 ▼':'펼치기 ▶';
 }
 
-function fmtDateTime(iso){
-  if(!iso) return '';
-  const d=new Date(iso);
-  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-}
-function fmtDate(s){
-  if(!s) return '';
-  const [y,m,d]=s.split('-');
-  return `${parseInt(m)}월 ${parseInt(d)}일`;
-}
-
-const PRIORITY_ORDER={urgent:0,important:1,normal:2};
-
 function renderTodos(){
   const all=Object.values(todosDB);
   const active=all.filter(t=>!t.done);
   const done=all.filter(t=>t.done);
   const sortPriority=document.getElementById('todoSortPriority')?.checked;
 
-  // 정렬 — 마감일 빠른순/없는건 뒤, 옵션이 켜지면 중요도 우선
   const sortFn=(a,b)=>{
     if(sortPriority){
       const pa=PRIORITY_ORDER[a.priority]??2, pb=PRIORITY_ORDER[b.priority]??2;
       if(pa!==pb) return pa-pb;
     }
-    if(a.deadline&&b.deadline) return a.deadline.localeCompare(b.deadline);
-    if(a.deadline&&!b.deadline) return -1;
-    if(!a.deadline&&b.deadline) return 1;
-    return (b.createdAt||'').localeCompare(a.createdAt||'');
+    return (a.order||0)-(b.order||0);
   };
   active.sort(sortFn);
-  done.sort((a,b)=>(b.doneAt||'').localeCompare(a.doneAt||'')); // 최근 완료 위로
+  done.sort((a,b)=>(b.doneAt||'').localeCompare(a.doneAt||''));
 
   document.getElementById('todoActiveCount').textContent=`(${active.length})`;
   document.getElementById('todoDoneCount').textContent=`(${done.length})`;
   document.getElementById('todoActiveList').innerHTML=active.length
-    ? active.map(renderTodoItem).join('')
-    : '<div class="todo-empty">진행 중인 인계사항이 없습니다</div>';
+    ? active.map((t,i)=>renderTodoItem(t,i,active.length)).join('')
+    : '<div class="todo-empty">인계사항이 없습니다</div>';
   document.getElementById('todoDoneList').innerHTML=done.length
-    ? done.map(renderTodoItem).join('')
+    ? done.map(t=>renderTodoItem(t,-1,-1)).join('')
     : '<div class="todo-empty">완료된 항목이 없습니다</div>';
 
-  // 다중 선택 바
   const bar=document.getElementById('todoBulkBar');
   if(todoSelection.size){
     bar.style.display='flex';
     document.getElementById('todoBulkCount').textContent=`${todoSelection.size}개 선택됨`;
   } else bar.style.display='none';
 
-  // 탭 배지 — 미완료 개수
   const badge=document.getElementById('todoBadge');
-  if(active.length){
-    badge.style.display='inline-block';
-    badge.textContent=active.length;
-  } else badge.style.display='none';
+  if(active.length){badge.style.display='inline-block';badge.textContent=active.length;}
+  else badge.style.display='none';
 }
 
-function renderTodoItem(t){
-  const today=toDateStr(new Date());
-  let dlHtml='';
-  if(t.deadline){
-    const cls=t.deadline<today?'overdue':t.deadline===today?'today':'';
-    const lbl=t.deadline<today?'⚠ 마감 지남: ':t.deadline===today?'📌 오늘 마감: ':'📅 마감: ';
-    dlHtml=`<div><span class="todo-deadline ${cls}">${lbl}${fmtDate(t.deadline)}</span></div>`;
-  }
+function renderTodoItem(t,idx,total){
   const priorityLabels={normal:'일반',important:'중요',urgent:'긴급'};
-  const meta=t.done
-    ? `✅ ${t.doneBy} · ${fmtDateTime(t.doneAt)} 완료 · 작성: ${t.author}`
-    : `작성: ${t.author} · ${fmtDateTime(t.createdAt)}`;
+  const isActive=!t.done;
+  let metaHtml='';
+  if(t.done){
+    metaHtml=`<div class="todo-meta">
+      <span>✍ ${t.author||'?'}</span> <span style="color:var(--faint);">${fmtDateTime(t.createdAt)}</span>
+      &nbsp;→&nbsp;
+      <span style="color:#1a7a4a;">✅ ${t.doneBy||'?'}</span> <span style="color:var(--faint);">${fmtDateTime(t.doneAt)}</span>
+    </div>`;
+  } else {
+    metaHtml=`<div class="todo-meta">✍ ${t.author||'?'} · ${fmtDateTime(t.createdAt)}</div>`;
+  }
   const selected=todoSelection.has(t.id)?' selected':'';
   const doneCls=t.done?' done':'';
+  const moveButtons=isActive?`
+    <button onclick="moveTodoUp('${t.id}')" style="background:none;border:none;cursor:pointer;padding:1px 4px;font-size:13px;color:var(--muted);" title="위로">▲</button>
+    <button onclick="moveTodoDown('${t.id}')" style="background:none;border:none;cursor:pointer;padding:1px 4px;font-size:13px;color:var(--muted);" title="아래로">▼</button>
+    <button onclick="editTodo('${t.id}')" style="background:none;border:none;cursor:pointer;padding:1px 5px;font-size:12px;color:var(--muted);" title="편집">✎</button>
+  `:'';
   return `<div class="todo-item${selected}${doneCls}">
     <input type="checkbox" class="todo-checkbox" ${t.done?'checked':''} onchange="toggleTodo('${t.id}')" title="완료 표시">
     <input type="checkbox" class="todo-checkbox" ${todoSelection.has(t.id)?'checked':''} onchange="toggleTodoSelect('${t.id}')" title="선택" style="accent-color:#2563a8;">
     <span class="todo-priority ${t.priority}">${priorityLabels[t.priority]}</span>
     <div class="todo-content">
       <div class="todo-text">${escapeHtml(t.text)}</div>
-      ${dlHtml}
-      <div class="todo-meta">${meta}</div>
+      ${metaHtml}
     </div>
-    <button class="todo-delete" onclick="deleteTodo('${t.id}')" title="삭제">×</button>
+    <div style="display:flex;align-items:center;gap:2px;">
+      ${moveButtons}
+      <button class="todo-delete" onclick="deleteTodo('${t.id}')" title="삭제">×</button>
+    </div>
   </div>`;
 }
 
@@ -3205,14 +3346,24 @@ function renderBigCalendar(){
     const [y,m,d]=date.split('-');
     const dow=new Date(date).getDay();
 
-    // 상단 행: 좌측 일자, 우측 근무자 배지
+    // 상단 행: 좌측(일자+공휴일명), 우측(근무자 배지)
     const topRow=document.createElement('div');
     topRow.className='big-cal-day-top';
 
+    const leftSide=document.createElement('div');
+    leftSide.style.cssText='display:flex;align-items:center;gap:3px;flex:1;min-width:0;overflow:hidden;';
     const numEl=document.createElement('div');
     numEl.className='big-cal-day-num'+(dow===0||isHoliday?' sun':dow===6?' sat':'');
     numEl.textContent=parseInt(d);
-    topRow.appendChild(numEl);
+    leftSide.appendChild(numEl);
+    if(isHoliday){
+      const hn=document.createElement('span');
+      hn.style.cssText='font-size:9px;font-weight:700;color:#c0392b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+      hn.textContent=holidayMap[date];
+      hn.title=holidayMap[date];
+      leftSide.appendChild(hn);
+    }
+    topRow.appendChild(leftSide);
 
     // 근무자 배지 (우상단)
     const dayShifts=shiftsDB[date];
@@ -3240,15 +3391,6 @@ function renderBigCalendar(){
       topRow.appendChild(badgeWrap);
     }
     cell.appendChild(topRow);
-
-    // 공휴일 이름 표시
-    if(isHoliday){
-      const hn=document.createElement('div');
-      hn.className='holiday-name';
-      hn.textContent=holidayMap[date];
-      hn.title=holidayMap[date];
-      cell.appendChild(hn);
-    }
 
     // 셀 클릭 처리
     cell.onclick=(e)=>{
@@ -3290,7 +3432,6 @@ function renderBigCalendar(){
 const today=toDateStr(new Date());
 document.getElementById('dateFrom').value=today;
 document.getElementById('dateTo').value=today;
-document.getElementById('todoDeadline').value=today;
 BOARDS.forEach(cfg=>buildBoard(cfg));
 BOARDS.forEach(cfg=>refreshTable(cfg.type));
 rebuildGlobalManagerSelect(getGlobalManager());
