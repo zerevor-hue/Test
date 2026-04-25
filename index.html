@@ -385,15 +385,101 @@ td.slot.dragging { opacity: 0.4; }
   .now-line { left: 48px; }
   .now-line .now-label { left: -32px; }
 }
+
+/* ═════ 인계사항 (Todo) ═════ */
+.todo-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 0.5px solid var(--border);
+  transition: background 0.1s;
+}
+.todo-item:last-child { border-bottom: none; }
+.todo-item:hover { background: #fafaf8; }
+.todo-item.selected { background: #f0f6ff; }
+.todo-item.done { opacity: 0.55; }
+.todo-item.done .todo-text { text-decoration: line-through; color: var(--muted); }
+.todo-checkbox { width: 18px; height: 18px; cursor: pointer; margin-top: 2px; flex-shrink: 0; accent-color: #1a7a4a; }
+.todo-priority {
+  flex-shrink: 0;
+  display: inline-block; padding: 2px 8px; border-radius: 6px;
+  font-size: 10px; font-weight: 800; margin-top: 1px;
+}
+.todo-priority.normal { background: #f0f0eb; color: #777; }
+.todo-priority.important { background: #fff2cc; color: #7a5c00; }
+.todo-priority.urgent { background: #ffe0e0; color: #c0392b; }
+.todo-content { flex: 1; min-width: 0; }
+.todo-text { font-size: 14px; font-weight: 600; color: var(--text); word-break: break-word; }
+.todo-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.todo-deadline { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; background: #f0f6ff; color: #2563a8; margin-top: 4px; }
+.todo-deadline.overdue { background: #ffe0e0; color: #c0392b; }
+.todo-deadline.today { background: #fff2cc; color: #7a5c00; }
+.todo-delete { background: none; border: none; color: var(--faint); font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1; }
+.todo-delete:hover { color: #c0392b; }
+.todo-empty { padding: 20px; text-align: center; color: var(--faint); font-size: 13px; }
+
+/* ═════ 일정 (큰 달력) ═════ */
+.big-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.big-cal-dow { background: #f7f7f4; padding: 8px 0; text-align: center; font-size: 12px; font-weight: 800; color: var(--muted); }
+.big-cal-dow.sun { color: #c0392b; }
+.big-cal-dow.sat { color: #2563a8; }
+.big-cal-day {
+  background: #fff;
+  min-height: 100px;
+  padding: 6px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.1s;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.big-cal-day:hover { background: #fafaf8; }
+.big-cal-day.other { background: #fafafa; color: var(--faint); }
+.big-cal-day.today { background: #f0f6ff; }
+.big-cal-day-num { font-size: 13px; font-weight: 700; }
+.big-cal-day-num.sun { color: #c0392b; }
+.big-cal-day-num.sat { color: #2563a8; }
+.big-cal-day.today .big-cal-day-num { background: #1a1a1a; color: #fff; padding: 2px 7px; border-radius: 12px; align-self: flex-start; }
+.cal-event {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 3px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: #fff;
+  margin-top: 1px;
+}
+.cal-event.start { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+.cal-event.end { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+.cal-event.middle { border-radius: 0; }
+.cal-event.single { border-radius: 8px; }
+.color-pick {
+  width: 28px; height: 28px; border-radius: 14px; cursor: pointer;
+  border: 2px solid transparent; transition: transform 0.1s;
+}
+.color-pick:hover { transform: scale(1.15); }
+.color-pick.selected { border-color: #1a1a1a; }
+
+@media(max-width: 700px) {
+  .big-cal-day { min-height: 70px; padding: 3px; }
+  .big-cal-day-num { font-size: 11px; }
+  .cal-event { font-size: 9px; padding: 1px 4px; }
+}
 </style>
 </head>
 <body>
 
-<!-- 글로벌 탭 -->
+<!-- 글로벌 탭 + 근무자 -->
 <div class="global-tabs">
   <button class="gtab active" onclick="showPage('reservation')">📅 예약 현황</button>
   <button class="gtab" onclick="showPage('members')">👥 회원 관리</button>
   <button class="gtab" onclick="showPage('stats')">📊 방문 통계</button>
+  <button class="gtab" onclick="showPage('todo')">📋 인계사항 <span id="todoBadge" style="display:none;background:#c0392b;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:3px;">0</span></button>
+  <button class="gtab" onclick="showPage('schedule')">📅 일정</button>
+  <div style="display:flex;align-items:center;gap:6px;padding:0 10px 0 6px;border-left:1px solid var(--border);margin-left:4px;">
+    <span style="font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;">근무자</span>
+    <select id="globalManager" onchange="onGlobalManagerChange()" style="padding:7px 8px;font-size:12px;font-weight:700;border:0.5px solid var(--border-md);border-radius:6px;font-family:inherit;background:#fff;color:var(--text);cursor:pointer;min-width:90px;">
+      <option value="">선택</option>
+      <option value="__new__">+ 직접 입력</option>
+    </select>
+    <input type="text" id="globalManagerCustom" placeholder="이름 입력 후 Enter" style="display:none;padding:7px 8px;font-size:12px;border:0.5px solid var(--border-md);border-radius:6px;font-family:inherit;width:120px;"/>
+  </div>
 </div>
 
 <!-- ══ 예약 현황 ══ -->
@@ -528,6 +614,88 @@ td.slot.dragging { opacity: 0.4; }
       <thead><tr><th style="width:36px;">순위</th><th>이름</th><th>방문 횟수</th><th>주 이용</th><th>등급</th></tr></thead>
       <tbody id="rankBody"></tbody>
     </table>
+  </div>
+</div>
+
+<!-- ══ 인계사항 ══ -->
+<div class="page" id="page-todo">
+  <div class="card" style="padding:14px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+      <input type="text" id="todoInput" placeholder="인계사항 입력 후 Enter (예: 1번방 청소)" style="flex:1;min-width:200px;padding:9px 12px;border:0.5px solid var(--border-md);border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;">
+      <select id="todoPriority" style="padding:9px 10px;border:0.5px solid var(--border-md);border-radius:8px;font-size:13px;font-weight:700;font-family:inherit;background:#fff;">
+        <option value="normal">⚪ 일반</option>
+        <option value="important">🟡 중요</option>
+        <option value="urgent">🔴 긴급</option>
+      </select>
+      <input type="date" id="todoDeadline" title="마감일 (선택)" style="padding:9px 10px;border:0.5px solid var(--border-md);border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;">
+      <button class="btn primary" onclick="addTodo()">+ 추가</button>
+    </div>
+  </div>
+
+  <!-- 다중 선택 컨트롤 -->
+  <div id="todoBulkBar" style="display:none;background:#1a1a1a;color:#fff;border-radius:8px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span id="todoBulkCount" style="font-size:13px;font-weight:700;">0개 선택됨</span>
+    <button onclick="bulkCompleteTodos()" style="padding:6px 12px;background:#1a7a4a;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">✓ 완료 처리</button>
+    <button onclick="bulkDeleteTodos()" style="padding:6px 12px;background:#c0392b;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">🗑️ 삭제</button>
+    <button onclick="clearTodoSelection()" style="padding:6px 12px;background:transparent;color:#fff;border:1px solid #555;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;margin-left:auto;">선택 해제</button>
+  </div>
+
+  <!-- 미완료 -->
+  <div class="card" style="padding:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:14px;font-weight:800;">진행 중 <span id="todoActiveCount" style="color:var(--muted);font-weight:700;">(0)</span></div>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;">
+        <input type="checkbox" id="todoSortPriority" onchange="renderTodos()" style="cursor:pointer;"> 중요도 순으로 정렬
+      </label>
+    </div>
+    <div id="todoActiveList"></div>
+  </div>
+
+  <!-- 완료 -->
+  <div class="card" style="padding:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:14px;font-weight:800;color:var(--muted);">✅ 완료된 항목 <span id="todoDoneCount">(0)</span></div>
+      <button onclick="toggleDoneList()" id="toggleDoneBtn" style="padding:5px 10px;font-size:11px;font-weight:700;background:transparent;border:0.5px solid var(--border-md);border-radius:6px;cursor:pointer;font-family:inherit;color:var(--muted);">접기 ▼</button>
+    </div>
+    <div id="todoDoneList"></div>
+  </div>
+</div>
+
+<!-- ══ 일정 ══ -->
+<div class="page" id="page-schedule">
+  <div class="card" style="padding:14px;">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+      <button class="btn" onclick="schedulePrevMonth()">‹</button>
+      <div id="scheduleMonthLabel" style="font-size:16px;font-weight:800;min-width:120px;text-align:center;">-</div>
+      <button class="btn" onclick="scheduleNextMonth()">›</button>
+      <button class="btn" onclick="scheduleToday()">오늘</button>
+      <button class="btn primary" style="margin-left:auto;" onclick="openScheduleModal()">+ 일정 추가</button>
+    </div>
+    <div id="bigCalendar"></div>
+  </div>
+</div>
+
+<!-- ══ 일정 모달 ══ -->
+<div class="modal-bg" id="scheduleModalBg">
+  <div class="modal">
+    <h3 id="scheduleModalTitle">일정 추가</h3>
+    <label>제목 *</label>
+    <input type="text" id="sTitle" placeholder="예: 봄맞이 대회">
+    <label>기간</label>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input type="date" id="sStart" style="flex:1;">
+      <span style="color:var(--muted);font-weight:700;">~</span>
+      <input type="date" id="sEnd" style="flex:1;">
+    </div>
+    <label>색상</label>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;" id="scheduleColorPicker"></div>
+    <label>메모 (선택)</label>
+    <textarea id="sMemo" rows="2" placeholder="간단한 설명 등"></textarea>
+    <div class="modal-btns">
+      <button class="mbtn" onclick="closeScheduleModal()">취소</button>
+      <button class="mbtn del" id="scheduleDeleteBtn" style="display:none;" onclick="deleteSchedule()">삭제</button>
+      <button class="mbtn primary" onclick="saveSchedule()">저장</button>
+    </div>
   </div>
 </div>
 
@@ -944,6 +1112,34 @@ onValue(ref(db, 'members'), snapshot => {
   membersDB = newMembers;
   if (typeof filterMembers === 'function') filterMembers();
   if (typeof calcStats === 'function' && document.getElementById('page-stats').classList.contains('active')) calcStats();
+});
+
+// ── 인계사항 (Todo) ──
+window.fbSaveTodo = function(id, data) {
+  return set(ref(db, `todos/${id}`), data).catch(e => console.warn('Todo 저장 실패:', e));
+};
+window.fbDeleteTodo = function(id) {
+  return remove(ref(db, `todos/${id}`)).catch(e => console.warn('Todo 삭제 실패:', e));
+};
+onValue(ref(db, 'todos'), snapshot => {
+  const data = snapshot.val();
+  todosDB = {};
+  if (data) Object.entries(data).forEach(([id, val]) => { todosDB[id] = val; });
+  if (typeof renderTodos === 'function') renderTodos();
+});
+
+// ── 일정 (Schedule) ──
+window.fbSaveSchedule = function(id, data) {
+  return set(ref(db, `schedules/${id}`), data).catch(e => console.warn('일정 저장 실패:', e));
+};
+window.fbDeleteSchedule = function(id) {
+  return remove(ref(db, `schedules/${id}`)).catch(e => console.warn('일정 삭제 실패:', e));
+};
+onValue(ref(db, 'schedules'), snapshot => {
+  const data = snapshot.val();
+  schedulesDB = {};
+  if (data) Object.entries(data).forEach(([id, val]) => { schedulesDB[id] = val; });
+  if (typeof renderBigCalendar === 'function') renderBigCalendar();
 });
 </script>
 
@@ -2308,6 +2504,418 @@ function showPage(name){
   document.getElementById(`page-${name}`).classList.add('active');
   if(name==='members') filterMembers();
   if(name==='stats'){ const t=new Date();setQuick(30); }
+  if(name==='todo') renderTodos();
+  if(name==='schedule') renderBigCalendar();
+}
+
+// ══ 글로벌 근무자 ══
+const LS_GLOBAL_MANAGER='golf_global_manager_v1';
+function getGlobalManager(){return localStorage.getItem(LS_GLOBAL_MANAGER)||'';}
+function setGlobalManager(v){if(v)localStorage.setItem(LS_GLOBAL_MANAGER,v);}
+function rebuildGlobalManagerSelect(sel){
+  const el=document.getElementById('globalManager');
+  const list=getManagerList();
+  el.innerHTML='<option value="">선택</option>';
+  list.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;el.appendChild(o);});
+  const a=document.createElement('option');a.value='__new__';a.textContent='+ 직접 입력';el.appendChild(a);
+  el.value=(sel&&list.includes(sel))?sel:'';
+}
+function onGlobalManagerChange(){
+  const el=document.getElementById('globalManager');
+  const cw=document.getElementById('globalManagerCustom');
+  if(el.value==='__new__'){
+    cw.style.display='inline-block';
+    setTimeout(()=>cw.focus(),30);
+  } else {
+    cw.style.display='none';
+    cw.value='';
+    if(el.value){
+      setGlobalManager(el.value);
+      saveManager(el.value); // 예약 입력 모달용 호환
+    }
+  }
+}
+document.getElementById('globalManagerCustom').addEventListener('keydown',function(e){
+  if(e.key==='Enter'){
+    const n=this.value.trim();
+    if(!n) return;
+    addToManagerList(n);
+    setGlobalManager(n);
+    saveManager(n);
+    rebuildGlobalManagerSelect(n);
+    document.getElementById('globalManagerCustom').style.display='none';
+    this.value='';
+  }
+});
+
+// ══ 인계사항 (Todo) ══
+let todosDB={};
+let todoSelection=new Set();
+let doneListExpanded=true;
+
+function addTodo(){
+  const text=document.getElementById('todoInput').value.trim();
+  if(!text){document.getElementById('todoInput').focus();return;}
+  const priority=document.getElementById('todoPriority').value;
+  const deadline=document.getElementById('todoDeadline').value||null;
+  const author=getGlobalManager();
+  if(!author){alert('상단에서 근무자를 먼저 선택해주세요.');return;}
+  const id='t_'+Date.now()+'_'+Math.floor(Math.random()*1000);
+  const todo={
+    id, text, priority, deadline,
+    author, createdAt: new Date().toISOString(),
+    done: false, doneBy: '', doneAt: ''
+  };
+  todosDB[id]=todo;
+  if(window.fbSaveTodo) window.fbSaveTodo(id,todo);
+  document.getElementById('todoInput').value='';
+  document.getElementById('todoDeadline').value='';
+  document.getElementById('todoPriority').value='normal';
+  renderTodos();
+}
+
+document.getElementById('todoInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter') addTodo();
+});
+
+function toggleTodo(id){
+  const t=todosDB[id]; if(!t) return;
+  if(!t.done){
+    const author=getGlobalManager();
+    if(!author){alert('상단에서 근무자를 먼저 선택해주세요.');return;}
+    t.done=true; t.doneBy=author; t.doneAt=new Date().toISOString();
+  } else {
+    t.done=false; t.doneBy=''; t.doneAt='';
+  }
+  if(window.fbSaveTodo) window.fbSaveTodo(t.id,t);
+  renderTodos();
+}
+
+function deleteTodo(id){
+  if(!confirm('이 항목을 삭제하시겠습니까?')) return;
+  delete todosDB[id];
+  if(window.fbDeleteTodo) window.fbDeleteTodo(id);
+  todoSelection.delete(id);
+  renderTodos();
+}
+
+function toggleTodoSelect(id){
+  if(todoSelection.has(id)) todoSelection.delete(id);
+  else todoSelection.add(id);
+  renderTodos();
+}
+
+function clearTodoSelection(){ todoSelection.clear(); renderTodos(); }
+
+function bulkCompleteTodos(){
+  const author=getGlobalManager();
+  if(!author){alert('상단에서 근무자를 먼저 선택해주세요.');return;}
+  todoSelection.forEach(id=>{
+    const t=todosDB[id];
+    if(t && !t.done){
+      t.done=true; t.doneBy=author; t.doneAt=new Date().toISOString();
+      if(window.fbSaveTodo) window.fbSaveTodo(t.id,t);
+    }
+  });
+  todoSelection.clear();
+  renderTodos();
+}
+
+function bulkDeleteTodos(){
+  if(!confirm(`선택한 ${todoSelection.size}개 항목을 삭제하시겠습니까?`)) return;
+  todoSelection.forEach(id=>{
+    delete todosDB[id];
+    if(window.fbDeleteTodo) window.fbDeleteTodo(id);
+  });
+  todoSelection.clear();
+  renderTodos();
+}
+
+function toggleDoneList(){
+  doneListExpanded=!doneListExpanded;
+  document.getElementById('todoDoneList').style.display=doneListExpanded?'block':'none';
+  document.getElementById('toggleDoneBtn').textContent=doneListExpanded?'접기 ▼':'펼치기 ▶';
+}
+
+function fmtDateTime(iso){
+  if(!iso) return '';
+  const d=new Date(iso);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function fmtDate(s){
+  if(!s) return '';
+  const [y,m,d]=s.split('-');
+  return `${parseInt(m)}월 ${parseInt(d)}일`;
+}
+
+const PRIORITY_ORDER={urgent:0,important:1,normal:2};
+
+function renderTodos(){
+  const all=Object.values(todosDB);
+  const active=all.filter(t=>!t.done);
+  const done=all.filter(t=>t.done);
+  const sortPriority=document.getElementById('todoSortPriority')?.checked;
+
+  // 정렬 — 마감일 빠른순/없는건 뒤, 옵션이 켜지면 중요도 우선
+  const sortFn=(a,b)=>{
+    if(sortPriority){
+      const pa=PRIORITY_ORDER[a.priority]??2, pb=PRIORITY_ORDER[b.priority]??2;
+      if(pa!==pb) return pa-pb;
+    }
+    if(a.deadline&&b.deadline) return a.deadline.localeCompare(b.deadline);
+    if(a.deadline&&!b.deadline) return -1;
+    if(!a.deadline&&b.deadline) return 1;
+    return (b.createdAt||'').localeCompare(a.createdAt||'');
+  };
+  active.sort(sortFn);
+  done.sort((a,b)=>(b.doneAt||'').localeCompare(a.doneAt||'')); // 최근 완료 위로
+
+  document.getElementById('todoActiveCount').textContent=`(${active.length})`;
+  document.getElementById('todoDoneCount').textContent=`(${done.length})`;
+  document.getElementById('todoActiveList').innerHTML=active.length
+    ? active.map(renderTodoItem).join('')
+    : '<div class="todo-empty">진행 중인 인계사항이 없습니다</div>';
+  document.getElementById('todoDoneList').innerHTML=done.length
+    ? done.map(renderTodoItem).join('')
+    : '<div class="todo-empty">완료된 항목이 없습니다</div>';
+
+  // 다중 선택 바
+  const bar=document.getElementById('todoBulkBar');
+  if(todoSelection.size){
+    bar.style.display='flex';
+    document.getElementById('todoBulkCount').textContent=`${todoSelection.size}개 선택됨`;
+  } else bar.style.display='none';
+
+  // 탭 배지 — 미완료 개수
+  const badge=document.getElementById('todoBadge');
+  if(active.length){
+    badge.style.display='inline-block';
+    badge.textContent=active.length;
+  } else badge.style.display='none';
+}
+
+function renderTodoItem(t){
+  const today=toDateStr(new Date());
+  let dlHtml='';
+  if(t.deadline){
+    const cls=t.deadline<today?'overdue':t.deadline===today?'today':'';
+    const lbl=t.deadline<today?'⚠ 마감 지남: ':t.deadline===today?'📌 오늘 마감: ':'📅 마감: ';
+    dlHtml=`<div><span class="todo-deadline ${cls}">${lbl}${fmtDate(t.deadline)}</span></div>`;
+  }
+  const priorityLabels={normal:'일반',important:'중요',urgent:'긴급'};
+  const meta=t.done
+    ? `✅ ${t.doneBy} · ${fmtDateTime(t.doneAt)} 완료 · 작성: ${t.author}`
+    : `작성: ${t.author} · ${fmtDateTime(t.createdAt)}`;
+  const selected=todoSelection.has(t.id)?' selected':'';
+  const doneCls=t.done?' done':'';
+  return `<div class="todo-item${selected}${doneCls}">
+    <input type="checkbox" class="todo-checkbox" ${t.done?'checked':''} onchange="toggleTodo('${t.id}')" title="완료 표시">
+    <input type="checkbox" class="todo-checkbox" ${todoSelection.has(t.id)?'checked':''} onchange="toggleTodoSelect('${t.id}')" title="선택" style="accent-color:#2563a8;">
+    <span class="todo-priority ${t.priority}">${priorityLabels[t.priority]}</span>
+    <div class="todo-content">
+      <div class="todo-text">${escapeHtml(t.text)}</div>
+      ${dlHtml}
+      <div class="todo-meta">${meta}</div>
+    </div>
+    <button class="todo-delete" onclick="deleteTodo('${t.id}')" title="삭제">×</button>
+  </div>`;
+}
+
+function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ══ 일정 (Schedule) ══
+let schedulesDB={};
+let scheduleViewYear, scheduleViewMonth;
+let editingScheduleId=null;
+const SCHEDULE_COLORS=[
+  {bg:'#2563a8',name:'파랑'},
+  {bg:'#1a7a4a',name:'초록'},
+  {bg:'#d6a820',name:'노랑'},
+  {bg:'#c0392b',name:'빨강'},
+  {bg:'#7b5ea7',name:'보라'},
+  {bg:'#e67e22',name:'주황'},
+  {bg:'#16a085',name:'청록'},
+  {bg:'#555',name:'회색'},
+];
+let selectedScheduleColor=SCHEDULE_COLORS[0].bg;
+
+function initScheduleColors(){
+  const wrap=document.getElementById('scheduleColorPicker');
+  wrap.innerHTML='';
+  SCHEDULE_COLORS.forEach(c=>{
+    const el=document.createElement('div');
+    el.className='color-pick';
+    el.style.background=c.bg;
+    el.dataset.color=c.bg;
+    el.title=c.name;
+    el.onclick=()=>{
+      selectedScheduleColor=c.bg;
+      wrap.querySelectorAll('.color-pick').forEach(x=>x.classList.toggle('selected',x.dataset.color===c.bg));
+    };
+    wrap.appendChild(el);
+  });
+  wrap.firstChild.classList.add('selected');
+}
+
+function schedulePrevMonth(){
+  scheduleViewMonth--;
+  if(scheduleViewMonth<0){scheduleViewMonth=11;scheduleViewYear--;}
+  renderBigCalendar();
+}
+function scheduleNextMonth(){
+  scheduleViewMonth++;
+  if(scheduleViewMonth>11){scheduleViewMonth=0;scheduleViewYear++;}
+  renderBigCalendar();
+}
+function scheduleToday(){
+  const t=new Date();
+  scheduleViewYear=t.getFullYear();
+  scheduleViewMonth=t.getMonth();
+  renderBigCalendar();
+}
+
+function openScheduleModal(presetDate){
+  editingScheduleId=null;
+  selectedScheduleColor=SCHEDULE_COLORS[0].bg;
+  initScheduleColors();
+  document.getElementById('scheduleModalTitle').textContent='일정 추가';
+  document.getElementById('sTitle').value='';
+  document.getElementById('sStart').value=presetDate||toDateStr(new Date());
+  document.getElementById('sEnd').value=presetDate||toDateStr(new Date());
+  document.getElementById('sMemo').value='';
+  document.getElementById('scheduleDeleteBtn').style.display='none';
+  document.getElementById('scheduleModalBg').classList.add('open');
+  setTimeout(()=>document.getElementById('sTitle').focus(),50);
+}
+function openEditScheduleModal(id){
+  const s=schedulesDB[id]; if(!s) return;
+  editingScheduleId=id;
+  selectedScheduleColor=s.color||SCHEDULE_COLORS[0].bg;
+  initScheduleColors();
+  document.getElementById('scheduleColorPicker').querySelectorAll('.color-pick').forEach(el=>{
+    el.classList.toggle('selected',el.dataset.color===selectedScheduleColor);
+  });
+  document.getElementById('scheduleModalTitle').textContent='일정 수정';
+  document.getElementById('sTitle').value=s.title;
+  document.getElementById('sStart').value=s.start;
+  document.getElementById('sEnd').value=s.end;
+  document.getElementById('sMemo').value=s.memo||'';
+  document.getElementById('scheduleDeleteBtn').style.display='block';
+  document.getElementById('scheduleModalBg').classList.add('open');
+}
+function closeScheduleModal(){document.getElementById('scheduleModalBg').classList.remove('open');}
+function saveSchedule(){
+  const title=document.getElementById('sTitle').value.trim();
+  if(!title){document.getElementById('sTitle').focus();return;}
+  const start=document.getElementById('sStart').value;
+  const end=document.getElementById('sEnd').value||start;
+  if(end<start){alert('종료일은 시작일 이후여야 합니다.');return;}
+  const id=editingScheduleId||'s_'+Date.now()+'_'+Math.floor(Math.random()*1000);
+  const data={
+    id, title, start, end,
+    color: selectedScheduleColor,
+    memo: document.getElementById('sMemo').value.trim()
+  };
+  schedulesDB[id]=data;
+  if(window.fbSaveSchedule) window.fbSaveSchedule(id,data);
+  closeScheduleModal();
+  renderBigCalendar();
+}
+function deleteSchedule(){
+  if(!confirm('이 일정을 삭제하시겠습니까?')) return;
+  if(window.fbDeleteSchedule) window.fbDeleteSchedule(editingScheduleId);
+  delete schedulesDB[editingScheduleId];
+  closeScheduleModal();
+  renderBigCalendar();
+}
+
+// 모달 외부 클릭 닫기
+document.getElementById('scheduleModalBg').addEventListener('click',e=>{
+  if(e.target===document.getElementById('scheduleModalBg')) closeScheduleModal();
+});
+
+function renderBigCalendar(){
+  if(scheduleViewYear===undefined){
+    const t=new Date();
+    scheduleViewYear=t.getFullYear();
+    scheduleViewMonth=t.getMonth();
+  }
+  document.getElementById('scheduleMonthLabel').textContent=`${scheduleViewYear}년 ${scheduleViewMonth+1}월`;
+
+  const cal=document.getElementById('bigCalendar');
+  cal.innerHTML='';
+  cal.className='big-cal';
+
+  // 요일 헤더
+  ['일','월','화','수','목','금','토'].forEach((d,i)=>{
+    const el=document.createElement('div');
+    el.className='big-cal-dow'+(i===0?' sun':i===6?' sat':'');
+    el.textContent=d;
+    cal.appendChild(el);
+  });
+
+  // 날짜 셀 (이전달 일부 + 현재달 + 다음달 일부 = 6주)
+  const firstDay=new Date(scheduleViewYear,scheduleViewMonth,1).getDay();
+  const daysInMonth=new Date(scheduleViewYear,scheduleViewMonth+1,0).getDate();
+  const prevDays=new Date(scheduleViewYear,scheduleViewMonth,0).getDate();
+  const todayStr=toDateStr(new Date());
+  const allCells=[]; // {date, isOther}
+
+  for(let i=firstDay-1;i>=0;i--){
+    const d=new Date(scheduleViewYear,scheduleViewMonth-1,prevDays-i);
+    allCells.push({date:toDateStr(d),isOther:true});
+  }
+  for(let d=1;d<=daysInMonth;d++){
+    allCells.push({date:`${scheduleViewYear}-${String(scheduleViewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`,isOther:false});
+  }
+  while(allCells.length<42){
+    const last=new Date(allCells[allCells.length-1].date);
+    last.setDate(last.getDate()+1);
+    allCells.push({date:toDateStr(last),isOther:true});
+  }
+
+  // 일정 매핑 — 각 날짜에 해당하는 일정들
+  const schedulesList=Object.values(schedulesDB).sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+
+  allCells.forEach(({date,isOther},idx)=>{
+    const cell=document.createElement('div');
+    cell.className='big-cal-day'+(isOther?' other':'')+(date===todayStr?' today':'');
+    const [y,m,d]=date.split('-');
+    const dow=new Date(date).getDay();
+    const numEl=document.createElement('div');
+    numEl.className='big-cal-day-num'+(dow===0?' sun':dow===6?' sat':'');
+    numEl.textContent=parseInt(d);
+    cell.appendChild(numEl);
+
+    // 셀 클릭 → 새 일정 추가
+    cell.onclick=(e)=>{
+      if(e.target.closest('.cal-event')) return;
+      openScheduleModal(date);
+    };
+
+    // 일정 막대 표시
+    schedulesList.forEach(s=>{
+      if(date>=s.start && date<=s.end){
+        const isStart=(date===s.start);
+        const isEnd=(date===s.end);
+        const isSingle=(s.start===s.end);
+        let cls='cal-event';
+        if(isSingle) cls+=' single';
+        else if(isStart) cls+=' start';
+        else if(isEnd) cls+=' end';
+        else cls+=' middle';
+        const ev=document.createElement('div');
+        ev.className=cls;
+        ev.style.background=s.color||'#2563a8';
+        ev.textContent=isStart||isSingle||dow===0?s.title:'';
+        ev.title=`${s.title} (${s.start} ~ ${s.end})${s.memo?'\n'+s.memo:''}`;
+        ev.onclick=(e)=>{e.stopPropagation();openEditScheduleModal(s.id);};
+        cell.appendChild(ev);
+      }
+    });
+
+    cal.appendChild(cell);
+  });
 }
 
 // ══ Init ══
@@ -2316,6 +2924,8 @@ document.getElementById('dateFrom').value=today;
 document.getElementById('dateTo').value=today;
 BOARDS.forEach(cfg=>buildBoard(cfg));
 BOARDS.forEach(cfg=>refreshTable(cfg.type));
+rebuildGlobalManagerSelect(getGlobalManager());
+initScheduleColors();
 </script>
 </body>
 </html>
