@@ -580,7 +580,7 @@ td.slot.dragging { opacity: 0.4; }
         <div class="ds-sec-title">시간대별 혼잡도</div>
         <div class="ds-bar-chart" id="dsScreenTimes"></div>
 
-        <div class="ds-sec-title">평일 / 주말·공휴일</div>
+        <div class="ds-sec-title">평일 / 주말·공휴일 (최근 7일)</div>
         <div class="ds-bar-chart" id="dsScreenWeekend"></div>
 
         <!-- 홀 단위 집계 -->
@@ -607,7 +607,7 @@ td.slot.dragging { opacity: 0.4; }
         <div class="ds-sec-title">시간대별 혼잡도</div>
         <div class="ds-bar-chart" id="dsParkTimes"></div>
 
-        <div class="ds-sec-title">평일 / 주말·공휴일</div>
+        <div class="ds-sec-title">평일 / 주말·공휴일 (최근 7일)</div>
         <div class="ds-bar-chart" id="dsParkWeekend"></div>
 
         <div class="ds-sec-title">홀 단위 집계</div>
@@ -2005,29 +2005,36 @@ function renderSummaryCol(type,date,bayNames){
     }).join('');
   }
 
-  // 3-b. 평일/주말(공휴일 포함) 분류
-  const hMap=getHolidayMap(new Date(date).getFullYear());
-  let weekdayCnt=0,weekendCnt=0;
-  bookings.forEach(b=>{
-    const dow=new Date(b.date).getDay();
-    const isWE=(dow===0||dow===6||!!hMap[b.date]);
-    if(isWE) weekendCnt++; else weekdayCnt++;
-  });
+  // 3-b. 평일/주말 — 최근 7일 기준 (해당 type 전체 데이터)
   const wEl=document.getElementById(prefix+'Weekend');
   if(wEl){
-    const tot=weekdayCnt+weekendCnt||1;
-    const wdW=Math.round(weekdayCnt/tot*100);
-    const weW=Math.round(weekendCnt/tot*100);
-    wEl.innerHTML=bookingCount===0?'<div class="ds-empty">예약 없음</div>':`
+    const today7=toDateStr(new Date());
+    const d7=new Date(); d7.setDate(d7.getDate()-6);
+    const date7=toDateStr(d7);
+    const hMap7=getHolidayMap(new Date().getFullYear());
+    // 최근 7일 내 예약 (날짜 무관하게 type 전체 DB에서 조회)
+    const recent7=Object.values(bookingsDB[type]).filter(b=>b.date>=date7&&b.date<=today7);
+    let wd7=0,we7=0;
+    recent7.forEach(b=>{
+      const dow=new Date(b.date).getDay();
+      const isWE=(dow===0||dow===6||!!hMap7[b.date]);
+      if(isWE) we7++; else wd7++;
+    });
+    const tot7=wd7+we7||1;
+    const wdW=Math.round(wd7/tot7*100);
+    const weW=Math.round(we7/tot7*100);
+    const lbl=`평일/주말 공휴일 (${parseInt(date7.slice(5,7))}/${parseInt(date7.slice(8))}~오늘)`;
+    wEl.innerHTML=recent7.length===0?'<div class="ds-empty">최근 7일 예약 없음</div>':`
+      <div style="font-size:10px;color:var(--muted);font-weight:700;margin-bottom:4px;">최근 7일 기준</div>
       <div class="ds-bar-row">
         <span class="ds-bar-label">평일</span>
         <div class="ds-bar-track"><div class="ds-bar-fill" style="width:${wdW}%"></div></div>
-        <span class="ds-bar-count">${weekdayCnt}건</span>
+        <span class="ds-bar-count">${wd7}건</span>
       </div>
       <div class="ds-bar-row">
         <span class="ds-bar-label">주말·공휴일</span>
         <div class="ds-bar-track"><div class="ds-bar-fill" style="width:${weW}%"></div></div>
-        <span class="ds-bar-count">${weekendCnt}건</span>
+        <span class="ds-bar-count">${we7}건</span>
       </div>`;
   }
 
@@ -2707,19 +2714,24 @@ function calcStats(){
   const to=document.getElementById('dateTo').value;
   if(!from||!to) return;
 
-  // 기간 내 예약 집계
+  // 기간 내 예약 집계 — 이름을 띄어쓰기로 분리해 개인별 집계
   const nameVisits={};  // {name: {visits, games, types, dates[]}}
   ['screen','park'].forEach(type=>{
     Object.values(bookingsDB[type]).forEach(b=>{
       if(b.date>=from&&b.date<=to){
         const games=parseInt(b.games||1);
         const people=parseInt(b.people||1);
-        const gameCount=games*people; // 인원 * 게임 수
-        if(!nameVisits[b.name]) nameVisits[b.name]={visits:0,games:0,types:{screen:0,park:0},dates:[]};
-        nameVisits[b.name].visits++;
-        nameVisits[b.name].games+=gameCount;
-        nameVisits[b.name].types[type]++;
-        nameVisits[b.name].dates.push(b.date);
+        // 이름을 띄어쓰기로 분리 (홍길동 김철수 → 각각 1건씩)
+        const names=(b.name||'').trim().split(/\s+/).filter(Boolean);
+        // 게임 수는 전체 예약 기준이므로 개인당 1/names.length로 나누지 않고 동일하게 기록
+        // (방문 횟수는 예약 1건 = 각 이름 1회 방문)
+        names.forEach(name=>{
+          if(!nameVisits[name]) nameVisits[name]={visits:0,games:0,types:{screen:0,park:0},dates:[]};
+          nameVisits[name].visits++;
+          nameVisits[name].games+=games; // 게임 수는 동일하게 기록
+          nameVisits[name].types[type]++;
+          nameVisits[name].dates.push(b.date);
+        });
       }
     });
   });
@@ -2727,8 +2739,15 @@ function calcStats(){
   const allMembers=Object.values(membersDB);
   const visitList=Object.entries(nameVisits).sort((a,b)=>b[1].visits-a[1].visits);
 
-  // 총 게임 수 (예약 인원 × 게임 수 합산)
-  const totGames=visitList.reduce((s,[,v])=>s+v.games,0);
+  // 총 게임 수 — 예약 건별로 (인원 × 게임 수) 합산 (이름 분리와 무관하게 예약 단위로 계산)
+  let totGames=0;
+  ['screen','park'].forEach(type=>{
+    Object.values(bookingsDB[type]).forEach(b=>{
+      if(b.date>=from&&b.date<=to){
+        totGames+=parseInt(b.games||1)*parseInt(b.people||1);
+      }
+    });
+  });
   // 방문 회원 수
   const uniq=visitList.length;
   // 단골 — 14일 내 2회 이상 방문한 회원 수
