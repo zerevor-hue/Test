@@ -200,7 +200,7 @@ td.slot.dragging { opacity: 0.4; }
    회원 관리 스타일
 ══════════════════════════════ */
 .card { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); border: 0.5px solid var(--border); padding: 16px; margin-bottom: 12px; }
-.search-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.search-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; position: sticky; top: 52px; z-index: 50; background: var(--bg); padding: 10px 0 8px; border-bottom: 0.5px solid var(--border); }
 .search-bar input, .search-bar select { padding: 9px 12px; border: 0.5px solid var(--border-md); border-radius: 8px; font-size: 13px; font-weight: 600; font-family: inherit; color: var(--text); background: var(--surface); }
 .search-bar input { flex: 1; min-width: 140px; }
 .search-bar input:focus, .search-bar select:focus { outline: none; border-color: #666; }
@@ -387,6 +387,7 @@ td.slot.dragging { opacity: 0.4; }
   .ds-kpi-num { font-size: 20px; }
   .now-line { left: 48px; }
   .now-line .now-label { left: -32px; }
+  .search-bar { top: 90px; } /* 모바일 탭이 두 줄로 wrap됨 */
   .page { padding-top: 10px; }
   .page-header { gap: 4px; }
   .page-title { font-size: 13px; }
@@ -666,10 +667,10 @@ td.slot.dragging { opacity: 0.4; }
     <button class="btn" onclick="setQuick(30)">최근 30일</button>
   </div>
   <div class="stat-cards">
-    <div class="stat-card"><div class="stat-num" id="sTot">-</div><div class="stat-label">총 방문 횟수</div></div>
+    <div class="stat-card"><div class="stat-num" id="sTot">-</div><div class="stat-label">총 게임 수</div></div>
     <div class="stat-card"><div class="stat-num" id="sUniq">-</div><div class="stat-label">방문 회원 수</div></div>
-    <div class="stat-card"><div class="stat-num" id="sAvg">-</div><div class="stat-label">1인 평균 방문</div></div>
-    <div class="stat-card"><div class="stat-num" id="sNew">-</div><div class="stat-label">신규 회원</div></div>
+    <div class="stat-card"><div class="stat-num" id="sReg">-</div><div class="stat-label">단골 <span style="font-size:10px;color:var(--muted);">14일·2회↑</span></div></div>
+    <div class="stat-card"><div class="stat-num" id="sTotal">-</div><div class="stat-label">전체 회원</div></div>
   </div>
   <div class="card">
     <div style="font-size:14px;font-weight:800;margin-bottom:12px;">🏆 방문 순위</div>
@@ -2707,27 +2708,44 @@ function calcStats(){
   if(!from||!to) return;
 
   // 기간 내 예약 집계
-  const nameVisits={};
+  const nameVisits={};  // {name: {visits, games, types, dates[]}}
   ['screen','park'].forEach(type=>{
     Object.values(bookingsDB[type]).forEach(b=>{
       if(b.date>=from&&b.date<=to){
-        if(!nameVisits[b.name]) nameVisits[b.name]={visits:0,types:{screen:0,park:0}};
+        const games=parseInt(b.games||1);
+        const people=parseInt(b.people||1);
+        const gameCount=games*people; // 인원 * 게임 수
+        if(!nameVisits[b.name]) nameVisits[b.name]={visits:0,games:0,types:{screen:0,park:0},dates:[]};
         nameVisits[b.name].visits++;
+        nameVisits[b.name].games+=gameCount;
         nameVisits[b.name].types[type]++;
+        nameVisits[b.name].dates.push(b.date);
       }
     });
   });
 
   const allMembers=Object.values(membersDB);
-  const newM=allMembers.filter(m=>m.joinDate>=from&&m.joinDate<=to).length;
   const visitList=Object.entries(nameVisits).sort((a,b)=>b[1].visits-a[1].visits);
-  const tot=visitList.reduce((s,[,v])=>s+v.visits,0);
-  const uniq=visitList.length;
 
-  document.getElementById('sTot').textContent=tot;
+  // 총 게임 수 (예약 인원 × 게임 수 합산)
+  const totGames=visitList.reduce((s,[,v])=>s+v.games,0);
+  // 방문 회원 수
+  const uniq=visitList.length;
+  // 단골 — 14일 내 2회 이상 방문한 회원 수
+  const today14=toDateStr(new Date());
+  const d14=new Date(); d14.setDate(d14.getDate()-14);
+  const date14=toDateStr(d14);
+  const regularCount=Object.values(nameVisits).filter(v=>{
+    const recentDates=v.dates.filter(d=>d>=date14&&d<=today14);
+    return recentDates.length>=2;
+  }).length;
+  // 전체 회원 수
+  const totalMembers=allMembers.length;
+
+  document.getElementById('sTot').textContent=totGames;
   document.getElementById('sUniq').textContent=uniq;
-  document.getElementById('sAvg').textContent=uniq?(tot/uniq).toFixed(1):0;
-  document.getElementById('sNew').textContent=newM;
+  document.getElementById('sReg').textContent=regularCount;
+  document.getElementById('sTotal').textContent=totalMembers;
 
   const max=visitList[0]?.[1].visits||1;
   const rc=['r1','r2','r3'];
