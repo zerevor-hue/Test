@@ -366,7 +366,10 @@ td.slot.dragging { opacity: 0.4; }
 
 /* Mobile */
 @media (max-width: 640px) {
-  body { padding: 10px 6px 32px; }
+  body { padding: 0 6px 32px; }
+  .global-tabs { flex-wrap: wrap; padding: 6px 8px; gap: 4px; }
+  .gtab { font-size: 11px; padding: 8px 6px; }
+  .global-tabs > div:last-child { width: 100%; padding: 6px 0 0 0 !important; border-left: none !important; border-top: 0.5px solid var(--border); margin-left: 0 !important; }
   .boards { gap: 10px; flex-direction: column; }
   .board { min-width: 0; width: 100%; }
   .table-wrap { margin: 6px; border-radius: 8px; }
@@ -384,6 +387,9 @@ td.slot.dragging { opacity: 0.4; }
   .ds-kpi-num { font-size: 20px; }
   .now-line { left: 48px; }
   .now-line .now-label { left: -32px; }
+  .page { padding-top: 10px; }
+  .page-header { gap: 4px; }
+  .page-title { font-size: 13px; }
 }
 
 /* ═════ 인계사항 (Todo) ═════ */
@@ -456,10 +462,57 @@ td.slot.dragging { opacity: 0.4; }
 .color-pick:hover { transform: scale(1.15); }
 .color-pick.selected { border-color: #1a1a1a; }
 
+/* 공휴일 */
+.holiday-name {
+  font-size: 9px; font-weight: 700; color: #c0392b;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-top: 1px;
+}
+.big-cal-day.holiday .big-cal-day-num { color: #c0392b; }
+
+/* 근무자 배지 */
+.shift-badges { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 2px; }
+.shift-badge {
+  font-size: 9px; font-weight: 800;
+  padding: 1px 6px; border-radius: 8px;
+  color: #fff;
+  white-space: nowrap; line-height: 1.5;
+  cursor: pointer;
+}
+.shift-badge:hover { opacity: 0.85; }
+.shift-badge.removable::after { content: ' ×'; opacity: 0.7; }
+
+/* 근무 설정 모드 */
+.work-edit-bar {
+  background: #1a1a1a; color: #fff; border-radius: 8px;
+  padding: 10px 14px; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.work-edit-bar .label {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.3px;
+}
+.work-staff-pick {
+  padding: 5px 12px; border-radius: 14px;
+  font-size: 12px; font-weight: 800;
+  color: #fff;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.1s;
+}
+.work-staff-pick:hover { transform: scale(1.05); }
+.work-staff-pick.selected { border-color: #fff; box-shadow: 0 0 0 2px #1a1a1a; }
+
+.body.work-edit-mode .big-cal-day { cursor: copy; }
+.work-edit-mode .big-cal-day.has-active-staff {
+  outline: 2px solid #1a7a4a; outline-offset: -2px;
+}
+
 @media(max-width: 700px) {
   .big-cal-day { min-height: 70px; padding: 3px; }
   .big-cal-day-num { font-size: 11px; }
   .cal-event { font-size: 9px; padding: 1px 4px; }
+  .shift-badge { font-size: 8px; padding: 1px 5px; }
+  .holiday-name { font-size: 8px; }
 }
 </style>
 </head>
@@ -626,8 +679,17 @@ td.slot.dragging { opacity: 0.4; }
       <div id="scheduleMonthLabel" style="font-size:16px;font-weight:800;min-width:120px;text-align:center;">-</div>
       <button class="btn" onclick="scheduleNextMonth()">›</button>
       <button class="btn" onclick="scheduleToday()">오늘</button>
-      <button class="btn primary" style="margin-left:auto;" onclick="openScheduleModal()">+ 일정 추가</button>
+      <button class="btn" id="workEditBtn" style="margin-left:auto;" onclick="toggleWorkEditMode()">👥 근무 설정</button>
+      <button class="btn primary" onclick="openScheduleModal()">+ 일정 추가</button>
     </div>
+
+    <!-- 근무 설정 바 -->
+    <div id="workEditBar" class="work-edit-bar" style="display:none;">
+      <span class="label">근무자 선택 → 달력 날짜 클릭으로 배정/해제</span>
+      <div id="workStaffPicks" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      <button class="btn" style="margin-left:auto;background:#fff;color:#1a1a1a;font-weight:800;" onclick="exitWorkEditMode()">완료</button>
+    </div>
+
     <div id="bigCalendar"></div>
   </div>
 
@@ -1141,6 +1203,29 @@ onValue(ref(db, 'schedules'), snapshot => {
   if (data) Object.entries(data).forEach(([id, val]) => { schedulesDB[id] = val; });
   if (typeof renderBigCalendar === 'function') renderBigCalendar();
 });
+
+// ── 근무 배정 (Shifts) ──
+// 구조: shifts/{date}/{staffName} = true
+window.fbSaveShift = function(date, staffName, value) {
+  const k = date.replace(/\./g,'_');
+  if (value) {
+    return set(ref(db, `shifts/${k}/${staffName}`), true).catch(e => console.warn('근무 저장 실패:', e));
+  } else {
+    return remove(ref(db, `shifts/${k}/${staffName}`)).catch(e => console.warn('근무 삭제 실패:', e));
+  }
+};
+onValue(ref(db, 'shifts'), snapshot => {
+  const data = snapshot.val();
+  shiftsDB = {};
+  if (data) {
+    Object.entries(data).forEach(([dateKey, staff]) => {
+      // dateKey가 YYYY-MM-DD 형태이긴 한데 _ 변환된 경우 복원
+      const date = dateKey.replace(/_/g, '-').replace(/-/g, '-'); // 통일
+      shiftsDB[date] = staff || {};
+    });
+  }
+  if (typeof renderBigCalendar === 'function') renderBigCalendar();
+});
 </script>
 
 <!-- 메인 스크립트 -->
@@ -1394,12 +1479,62 @@ function attachSlotEvents(td,type,bayIdx,time,bayName){
     if(selectDrag&&selectDrag.committed) return;
     openModal(type,bayIdx,time,bayName);
   });
+
+  // ── 모바일 long-press 처리 ──
+  // 0.5초 누르고 있으면 진동 + 모달/드래그 모드 진입
+  // 짧게 탭하거나 스크롤 의도면 무시
+  let pressTimer=null;
+  let pressStartXY=null;
+  let pressTriggered=false;
+
   td.addEventListener('touchstart',e=>{
-    const found=getAt(type,boardState[type].date,bayIdx,time);
-    if(found) startDragTouch(e,type,found.key,found.b,td);
-    else startSelectDragTouch(e,type,bayIdx,time);
-  },{passive:false});
-  // 예약된 셀 마우스오버 시 회원 정보 툴팁 / 빈 셀은 시간 툴팁
+    if(e.touches.length!==1) return;
+    pressTriggered=false;
+    const t=e.touches[0];
+    pressStartXY={x:t.clientX,y:t.clientY};
+    pressTimer=setTimeout(()=>{
+      pressTriggered=true;
+      // 햅틱 피드백 (지원 시)
+      if(navigator.vibrate) navigator.vibrate(40);
+      // long-press → 예약된 칸이면 드래그 모드, 빈 칸이면 모달 열기
+      const found=getAt(type,boardState[type].date,bayIdx,time);
+      if(found){
+        // 가짜 이벤트로 startDragTouch에 위치 전달
+        const fakeEvent={touches:[{clientX:pressStartXY.x,clientY:pressStartXY.y}],preventDefault:()=>{}};
+        startDragTouch(fakeEvent,type,found.key,found.b,td);
+      } else {
+        openModal(type,bayIdx,time,bayName);
+      }
+    },500);
+  },{passive:true});
+
+  td.addEventListener('touchmove',e=>{
+    if(!pressTimer||pressTriggered) return;
+    // 손가락 움직임이 8px 넘으면 스크롤 의도로 보고 long-press 취소
+    const t=e.touches[0];
+    const dx=Math.abs(t.clientX-pressStartXY.x);
+    const dy=Math.abs(t.clientY-pressStartXY.y);
+    if(dx>8||dy>8){
+      clearTimeout(pressTimer);
+      pressTimer=null;
+    }
+  },{passive:true});
+
+  td.addEventListener('touchend',e=>{
+    if(pressTimer){
+      clearTimeout(pressTimer);
+      pressTimer=null;
+    }
+  },{passive:true});
+
+  td.addEventListener('touchcancel',e=>{
+    if(pressTimer){
+      clearTimeout(pressTimer);
+      pressTimer=null;
+    }
+  },{passive:true});
+
+  // 마우스오버 툴팁
   td.addEventListener('mouseenter',e=>{
     if(drag||selectDrag) return;
     const found=getAt(type,boardState[type].date,bayIdx,time);
@@ -2724,6 +2859,8 @@ function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;
 
 // ══ 일정 (Schedule) ══
 let schedulesDB={};
+let shiftsDB={};  // {date: {staffName: true}}
+let holidaysCache={}; // {year: [{date, name}]}
 let scheduleViewYear, scheduleViewMonth;
 let editingScheduleId=null;
 const SCHEDULE_COLORS=[
@@ -2737,6 +2874,102 @@ const SCHEDULE_COLORS=[
   {bg:'#555',name:'회색'},
 ];
 let selectedScheduleColor=SCHEDULE_COLORS[0].bg;
+
+// ── 근무자 컬러 매핑 (이름별 자동 할당) ──
+const STAFF_COLORS=['#2563a8','#1a7a4a','#d6a820','#c0392b','#7b5ea7','#e67e22','#16a085','#34495e','#d35400','#27ae60'];
+function getStaffColor(name){
+  if(!name) return '#888';
+  const list=getManagerList();
+  const idx=list.indexOf(name);
+  if(idx<0) return '#888';
+  return STAFF_COLORS[idx%STAFF_COLORS.length];
+}
+
+// ── 공휴일 API (Nager.Date — 무료, CORS 지원, 키 불필요) ──
+async function fetchHolidays(year){
+  if(holidaysCache[year]) return holidaysCache[year];
+  try {
+    const res=await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/KR`);
+    if(!res.ok) throw new Error('API 응답 오류');
+    const data=await res.json();
+    // {date: 'YYYY-MM-DD', name: '...'}
+    holidaysCache[year]=data.map(h=>({date:h.date, name:h.localName||h.name}));
+    return holidaysCache[year];
+  } catch(e) {
+    console.warn('공휴일 API 실패:', e);
+    holidaysCache[year]=[]; // 실패해도 빈 배열로 캐시 (반복 요청 방지)
+    return [];
+  }
+}
+function getHolidayMap(year){
+  // 동기적 조회용 (이미 캐시된 데이터)
+  const arr=holidaysCache[year]||[];
+  const map={};
+  arr.forEach(h=>{map[h.date]=h.name;});
+  return map;
+}
+
+// ── 근무 설정 모드 ──
+let workEditMode=false;
+let activeWorkStaff=null;
+
+function toggleWorkEditMode(){
+  workEditMode=!workEditMode;
+  const bar=document.getElementById('workEditBar');
+  const btn=document.getElementById('workEditBtn');
+  if(workEditMode){
+    bar.style.display='flex';
+    btn.classList.add('primary');
+    btn.textContent='👥 근무 설정 중...';
+    document.body.classList.add('work-edit-mode');
+    renderWorkStaffPicks();
+  } else {
+    exitWorkEditMode();
+  }
+  renderBigCalendar();
+}
+function exitWorkEditMode(){
+  workEditMode=false;
+  activeWorkStaff=null;
+  document.getElementById('workEditBar').style.display='none';
+  const btn=document.getElementById('workEditBtn');
+  btn.classList.remove('primary');
+  btn.textContent='👥 근무 설정';
+  document.body.classList.remove('work-edit-mode');
+  renderBigCalendar();
+}
+function renderWorkStaffPicks(){
+  const wrap=document.getElementById('workStaffPicks');
+  const list=getManagerList();
+  if(!list.length){
+    wrap.innerHTML='<span style="font-size:11px;opacity:0.7;">근무자 명단이 없습니다. 상단 "근무자" 드롭다운에서 직접 입력으로 추가해주세요.</span>';
+    return;
+  }
+  wrap.innerHTML=list.map(name=>{
+    const col=getStaffColor(name);
+    const sel=name===activeWorkStaff?' selected':'';
+    return `<button class="work-staff-pick${sel}" style="background:${col};" onclick="setActiveWorkStaff('${name.replace(/'/g,"\\'")}')">${name}</button>`;
+  }).join('');
+}
+function setActiveWorkStaff(name){
+  activeWorkStaff=activeWorkStaff===name?null:name;
+  renderWorkStaffPicks();
+  renderBigCalendar();
+}
+
+function toggleStaffOnDate(date){
+  if(!workEditMode||!activeWorkStaff) return;
+  if(!shiftsDB[date]) shiftsDB[date]={};
+  const has=shiftsDB[date][activeWorkStaff];
+  if(has){
+    delete shiftsDB[date][activeWorkStaff];
+    if(window.fbSaveShift) window.fbSaveShift(date,activeWorkStaff,false);
+  } else {
+    shiftsDB[date][activeWorkStaff]=true;
+    if(window.fbSaveShift) window.fbSaveShift(date,activeWorkStaff,true);
+  }
+  renderBigCalendar();
+}
 
 function initScheduleColors(){
   const wrap=document.getElementById('scheduleColorPicker');
@@ -2841,6 +3074,12 @@ function renderBigCalendar(){
   }
   document.getElementById('scheduleMonthLabel').textContent=`${scheduleViewYear}년 ${scheduleViewMonth+1}월`;
 
+  // 공휴일 데이터 비동기 로드 — 캐시되어있지 않으면 받아오고 다시 렌더
+  if(!holidaysCache[scheduleViewYear]){
+    fetchHolidays(scheduleViewYear).then(()=>renderBigCalendar());
+  }
+  const holidayMap=getHolidayMap(scheduleViewYear);
+
   const cal=document.getElementById('bigCalendar');
   cal.innerHTML='';
   cal.className='big-cal';
@@ -2858,7 +3097,7 @@ function renderBigCalendar(){
   const daysInMonth=new Date(scheduleViewYear,scheduleViewMonth+1,0).getDate();
   const prevDays=new Date(scheduleViewYear,scheduleViewMonth,0).getDate();
   const todayStr=toDateStr(new Date());
-  const allCells=[]; // {date, isOther}
+  const allCells=[];
 
   for(let i=firstDay-1;i>=0;i--){
     const d=new Date(scheduleViewYear,scheduleViewMonth-1,prevDays-i);
@@ -2873,26 +3112,43 @@ function renderBigCalendar(){
     allCells.push({date:toDateStr(last),isOther:true});
   }
 
-  // 일정 매핑 — 각 날짜에 해당하는 일정들
   const schedulesList=Object.values(schedulesDB).sort((a,b)=>(a.start||'').localeCompare(b.start||''));
 
   allCells.forEach(({date,isOther},idx)=>{
     const cell=document.createElement('div');
-    cell.className='big-cal-day'+(isOther?' other':'')+(date===todayStr?' today':'');
+    const isHoliday=!!holidayMap[date];
+    cell.className='big-cal-day'+(isOther?' other':'')+(date===todayStr?' today':'')+(isHoliday?' holiday':'');
+    if(workEditMode && activeWorkStaff && shiftsDB[date]?.[activeWorkStaff]){
+      cell.classList.add('has-active-staff');
+    }
     const [y,m,d]=date.split('-');
     const dow=new Date(date).getDay();
     const numEl=document.createElement('div');
-    numEl.className='big-cal-day-num'+(dow===0?' sun':dow===6?' sat':'');
+    numEl.className='big-cal-day-num'+(dow===0||isHoliday?' sun':dow===6?' sat':'');
     numEl.textContent=parseInt(d);
     cell.appendChild(numEl);
 
-    // 셀 클릭 → 새 일정 추가
+    // 공휴일 이름 표시
+    if(isHoliday){
+      const hn=document.createElement('div');
+      hn.className='holiday-name';
+      hn.textContent=holidayMap[date];
+      hn.title=holidayMap[date];
+      cell.appendChild(hn);
+    }
+
+    // 셀 클릭 처리
     cell.onclick=(e)=>{
-      if(e.target.closest('.cal-event')) return;
-      openScheduleModal(date);
+      if(e.target.closest('.cal-event')||e.target.closest('.shift-badge')) return;
+      if(workEditMode){
+        if(activeWorkStaff) toggleStaffOnDate(date);
+        else alert('상단에서 근무자를 먼저 선택해주세요.');
+      } else {
+        openScheduleModal(date);
+      }
     };
 
-    // 일정 막대 표시
+    // 일정 막대
     schedulesList.forEach(s=>{
       if(date>=s.start && date<=s.end){
         const isStart=(date===s.start);
@@ -2912,6 +3168,32 @@ function renderBigCalendar(){
         cell.appendChild(ev);
       }
     });
+
+    // 근무자 배지 표시
+    const dayShifts=shiftsDB[date];
+    if(dayShifts && Object.keys(dayShifts).length){
+      const badgeWrap=document.createElement('div');
+      badgeWrap.className='shift-badges';
+      Object.keys(dayShifts).forEach(staff=>{
+        const b=document.createElement('div');
+        b.className='shift-badge';
+        b.style.background=getStaffColor(staff);
+        b.textContent=staff;
+        b.title=staff;
+        if(workEditMode){
+          b.classList.add('removable');
+          b.onclick=(e)=>{
+            e.stopPropagation();
+            // 클릭한 배지의 근무자 제거
+            delete shiftsDB[date][staff];
+            if(window.fbSaveShift) window.fbSaveShift(date,staff,false);
+            renderBigCalendar();
+          };
+        }
+        badgeWrap.appendChild(b);
+      });
+      cell.appendChild(badgeWrap);
+    }
 
     cal.appendChild(cell);
   });
