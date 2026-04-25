@@ -1651,12 +1651,16 @@ function showTipForBooking(e,b){
       // 방문 횟수
       const visits=getMemberVisits(m.name);
       html+=`<div style="font-size:11px;opacity:0.85;">📊 총 예약 ${visits}회</div>`;
-      // 일행 (이름 + 차량번호)
+      // 일행 (이름 + 차량번호) — ID 직접 조회 실패 시 이름으로 fallback
       const companionInfos=(m.companions||[]).map(cid=>{
-        const cm=membersDB[cid]; if(!cm) return null;
-        return cm.car?`${cm.name} (${cm.car})`:cm.name;
+        // 1순위: ID로 직접 조회
+        let cm=membersDB[cid];
+        // 2순위: ID가 맞는 회원이 없으면 companions 배열에 저장된 값이 이름일 수도 있음
+        if(!cm) cm=Object.values(membersDB).find(x=>x.id===cid||x.name===cid);
+        if(!cm) return null;
+        return cm.car?`${cm.name} · 🚗${cm.car}`:cm.name;
       }).filter(Boolean);
-      if(companionInfos.length) html+=`<div style="font-size:11px;opacity:0.85;">👥 일행: ${companionInfos.join(', ')}</div>`;
+      if(companionInfos.length) html+=`<div style="font-size:11px;opacity:0.85;margin-top:3px;">👥 일행: ${companionInfos.join(' / ')}</div>`;
       // 최근 메모
       if(m.memos&&m.memos.length) html+=`<div style="font-size:11px;opacity:0.7;margin-top:2px;">💬 ${m.memos[m.memos.length-1].text}</div>`;
     }
@@ -2496,8 +2500,11 @@ function showTip(e,m){
   const ls=d===0?'오늘':d===1?'어제':`${d}일 전`;
   let aHTML='';
   if(a){const types=[];if(a.sc>0)types.push(`스크린 ${a.sc}회`);if(a.pk>0)types.push(`파크 ${a.pk}회`);aHTML=`<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,0.15);font-size:11px;opacity:0.9;"><div>⛳ ${types.join(' / ')}</div><div>${a.weCnt>=a.wdCnt?'📅 주말 선호':'📅 평일 선호'} · ${a.topTime[0]}</div></div>`;}
-  const companions=(m.companions||[]).map(cid=>membersDB[cid]?.name).filter(Boolean);
-  const companionHTML=companions.length?`<div style="margin-top:4px;font-size:11px;">👥 ${companions.join(', ')}</div>`:'';
+  const companions=(m.companions||[]).map(cid=>{
+    const cm=getMemberById(cid); if(!cm) return null;
+    return cm.car?`${cm.name} · 🚗${cm.car}`:cm.name;
+  }).filter(Boolean);
+  const companionHTML=companions.length?`<div style="margin-top:4px;font-size:11px;">👥 ${companions.join(' / ')}</div>`:'';
   t.innerHTML=`<div class="t-name">${m.name} ${gradesBadges(m)}</div>
     <div>📞 ${m.phone||'-'}</div><div>🚗 ${m.car||'-'}</div>
     <div>🕐 마지막 방문: ${ls}</div><div>📊 예약 이력: ${m._visits||0}회</div>
@@ -2563,9 +2570,9 @@ function renderCompanionList(){
   const el=document.getElementById('companionList');
   el.innerHTML='';
   currentCompanions.forEach(cid=>{
-    const cm=membersDB[cid]; if(!cm) return;
+    const cm=getMemberById(cid); if(!cm) return;
     const tag=document.createElement('div'); tag.className='companion-tag';
-    tag.innerHTML=`<span>${cm.name}</span><button onclick="removeCompanion('${cid}')">×</button>`;
+    tag.innerHTML=`<span>${cm.name}${cm.car?' · '+cm.car:''}</span><button onclick="removeCompanion('${cid}')">×</button>`;
     el.appendChild(tag);
   });
 }
@@ -2600,24 +2607,47 @@ function removeCompanion(cid){
 }
 
 // 일행 저장 — 양방향 연결
+// 회원 ID로 membersDB 조회 — ID 직접 조회 실패 시 id 필드로 fallback
+function getMemberById(id){
+  if(!id) return null;
+  if(membersDB[id]) return membersDB[id];
+  return Object.values(membersDB).find(m=>m.id===id)||null;
+}
+
 function saveCompanions(myId){
   const myOldCompanions=(membersDB[myId]?.companions||[]);
+
   // 제거된 일행에서 나를 빼기
   myOldCompanions.forEach(cid=>{
-    if(!currentCompanions.includes(cid)&&membersDB[cid]){
-      membersDB[cid].companions=(membersDB[cid].companions||[]).filter(id=>id!==myId);
-      if(window.fbSaveMember) window.fbSaveMember(cid,membersDB[cid]);
+    if(!currentCompanions.includes(cid)){
+      const cm=getMemberById(cid);
+      if(cm){
+        cm.companions=(cm.companions||[]).filter(id=>id!==myId);
+        if(window.fbSaveMember){
+          window.pendingMembers=window.pendingMembers||{};
+          window.pendingMembers[cid]={data:cm,ts:Date.now()};
+          window.fbSaveMember(cid,cm);
+        }
+      }
     }
   });
-  // 새 일행에 나를 추가
+
+  // 새 일행에 나를 추가 (양방향)
   currentCompanions.forEach(cid=>{
-    if(membersDB[cid]){
-      if(!membersDB[cid].companions) membersDB[cid].companions=[];
-      if(!membersDB[cid].companions.includes(myId)) membersDB[cid].companions.push(myId);
-      if(window.fbSaveMember) window.fbSaveMember(cid,membersDB[cid]);
+    const cm=getMemberById(cid);
+    if(cm){
+      if(!cm.companions) cm.companions=[];
+      if(!cm.companions.includes(myId)) cm.companions.push(myId);
+      if(window.fbSaveMember){
+        window.pendingMembers=window.pendingMembers||{};
+        window.pendingMembers[cid]={data:cm,ts:Date.now()};
+        window.fbSaveMember(cid,cm);
+      }
     }
   });
-  membersDB[myId].companions=[...currentCompanions];
+
+  // 내 companions 업데이트
+  if(membersDB[myId]) membersDB[myId].companions=[...currentCompanions];
 }
 
 // 드롭다운 외부 클릭 시 닫기 (회원 모달 열려있을 때만)
