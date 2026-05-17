@@ -10,6 +10,8 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+*, *::before, *::after { box-sizing: border-box; }
+
 :root {
   --bg: #f0f0eb;
   --surface: #fff;
@@ -202,7 +204,7 @@ td.slot.dragging { opacity: 0.4; }
 /* ══════════════════════════════
    회원 관리 스타일
 ══════════════════════════════ */
-.card { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); border: 0.5px solid var(--border); padding: 16px; margin-bottom: 12px; }
+.card { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); border: 0.5px solid var(--border); padding: 16px; margin-bottom: 12px; box-sizing: border-box; max-width: 100%; }
 .search-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; position: sticky; top: 52px; z-index: 50; background: var(--bg); padding: 10px 0 8px; border-bottom: 0.5px solid var(--border); }
 .search-bar input, .search-bar select { padding: 9px 12px; border: 0.5px solid var(--border-md); border-radius: 8px; font-size: 13px; font-weight: 600; font-family: inherit; color: var(--text); background: var(--surface); }
 .search-bar input { flex: 1; min-width: 140px; }
@@ -409,16 +411,50 @@ td.slot.dragging { opacity: 0.4; }
   .page { padding-top: 10px; }
   .page-header { gap: 4px; }
   .page-title { font-size: 13px; }
-  /* 달력 — 7칸 균등 분할 */
-  .big-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; }
-  .big-cal-dow { font-size: 10px; padding: 5px 0; }
-  .big-cal-day { min-height: 58px; padding: 3px 2px; }
-  .big-cal-day-num { font-size: 11px; }
-  .cal-event { font-size: 8px; padding: 1px 3px; }
-  .shift-badge { font-size: 8px; padding: 1px 4px; }
-  .holiday-name { font-size: 8px; max-width: 42px; }
+  /* 달력 — 모바일 */
+  .big-cal-dow { font-size: 10px; padding: 4px 0; }
+  .big-cal-day { min-height: 60px; padding: 2px 1px; }
+  .big-cal-day-top {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2px;
+    min-height: unset;
+    flex-wrap: nowrap;
+  }
+  .big-cal-day-num {
+    font-size: 10px;
+    font-weight: 800;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .big-cal-day.today .big-cal-day-num {
+    font-size: 9px;
+    padding: 2px 4px;
+    border-radius: 10px;
+  }
+  .shift-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    justify-content: flex-end;
+    min-width: 0;
+    flex: 1;
+  }
+  .shift-badge {
+    font-size: 8px !important;
+    padding: 1px 4px !important;
+    border-radius: 6px !important;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: unset;
+    -webkit-text-fill-color: #fff !important;
+  }
+  .cal-event { font-size: 8px; padding: 1px 2px; }
+  .holiday-name { font-size: 7px; max-width: 36px; }
   /* 카드/모달 padding 축소 */
-  .card { padding: 12px 10px !important; }
+  .card { padding: 10px 6px !important; }
   .modal { padding: 16px; max-width: calc(100vw - 24px); }
   .mmodal { padding: 16px; max-width: calc(100vw - 24px); }
   /* 모달 버튼 영역 */
@@ -473,24 +509,27 @@ td.slot.dragging { opacity: 0.4; }
 .todo-empty { padding: 20px; text-align: center; color: var(--faint); font-size: 13px; }
 
 /* ═════ 일정 (큰 달력) ═════ */
-.big-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
-.big-cal-dow { background: #f7f7f4; padding: 8px 0; text-align: center; font-size: 12px; font-weight: 800; color: var(--muted); }
+.big-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--border); border-radius: 8px; overflow: hidden; border: 1px solid var(--border); width: 100%; box-sizing: border-box; }
+.big-cal-dow { background: #f7f7f4; padding: 8px 0; text-align: center; font-size: 12px; font-weight: 800; color: var(--muted); min-width: 0; box-sizing: border-box; overflow: hidden; }
 .big-cal-dow.sun { color: #c0392b; }
 .big-cal-dow.sat { color: #2563a8; }
 .big-cal-day {
   background: #fff;
   min-height: 100px;
+  min-width: 0;
   padding: 6px;
   position: relative;
   cursor: pointer;
   transition: background 0.1s;
   display: flex; flex-direction: column; gap: 2px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 .big-cal-day:hover { background: #fafaf8; }
 .big-cal-day.other { background: #e8e8e3; color: #aaa; }
 .big-cal-day.other .big-cal-day-num { color: #bbb; }
 .big-cal-day.today { background: #f0f6ff; }
-.big-cal-day-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; min-height: 18px; }
+.big-cal-day-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; min-height: 18px; min-width: 0; }
 .big-cal-day-num { font-size: 13px; font-weight: 700; flex-shrink: 0; }
 .big-cal-day-num.sun { color: #c0392b; }
 .big-cal-day-num.sat { color: #2563a8; }
@@ -501,6 +540,9 @@ td.slot.dragging { opacity: 0.4; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: #fff;
   margin-top: 1px;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .cal-event.start { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
 .cal-event.end { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
@@ -673,7 +715,7 @@ td.slot.dragging { opacity: 0.4; }
 <!-- ══ 회원 관리 ══ -->
 <div class="page" id="page-members">
   <div class="search-bar">
-    <input type="text" id="searchInput" placeholder="이름 또는 전화번호 검색..." oninput="filterMembers()">
+    <input type="text" id="searchInput" placeholder="이름 · 전화번호 · 차량번호 (* 와일드카드)" oninput="filterMembers()">
     <select id="gradeFilter" onchange="filterMembers()">
       <option value="">전체</option>
       <optgroup label="🏌️ 스크린">
@@ -683,6 +725,7 @@ td.slot.dragging { opacity: 0.4; }
       </optgroup>
       <optgroup label="⛳ 파크">
         <option value="동호회원">동호회원</option>
+        <option value="파크골프">파크골프</option>
         <option value="일반">일반</option>
       </optgroup>
       <option value="__blacklist__">⚠ 블랙리스트</option>
@@ -709,24 +752,134 @@ td.slot.dragging { opacity: 0.4; }
 
 <!-- ══ 방문 통계 ══ -->
 <div class="page" id="page-stats">
-  <div class="date-range">
-    <input type="date" id="dateFrom">
-    <span>~</span>
-    <input type="date" id="dateTo">
-    <button class="btn blue" onclick="calcStats()">조회</button>
-    <button class="btn" onclick="setQuick(7)">최근 7일</button>
-    <button class="btn" onclick="setQuick(30)">최근 30일</button>
+  <!-- 필터 카드 (접기/펼치기) -->
+  <div class="card" style="padding:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleStatsFilter()">
+      <div style="font-size:14px;font-weight:800;">🔍 필터</div>
+      <button id="statsFilterToggleBtn" style="background:none;border:0.5px solid var(--border-md);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--muted);">펼치기 ▶</button>
+    </div>
+
+    <div id="statsFilterBody" style="display:none;margin-top:14px;">
+      <!-- 1. 기간 -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">기간</div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <input type="date" id="dateFrom" style="flex:1;min-width:120px;">
+          <span style="color:var(--muted);">~</span>
+          <input type="date" id="dateTo" style="flex:1;min-width:120px;">
+          <button class="btn" onclick="setQuick(7)">7일</button>
+          <button class="btn" onclick="setQuick(30)">30일</button>
+          <button class="btn" onclick="setQuick(90)">90일</button>
+        </div>
+      </div>
+
+      <!-- 2. 이름 -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">이름 검색</div>
+        <input type="text" id="statsNameFilter" placeholder="이름 입력..." oninput="calcStats()"
+          style="width:100%;padding:8px 10px;border:0.5px solid var(--border-md);border-radius:8px;font-size:14px;font-family:inherit;">
+      </div>
+
+      <!-- 3. 방문 횟수 -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">게임 횟수 (게임 수 합산 기준)</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <input type="number" id="statsVisitMin" placeholder="최소" min="0" oninput="calcStats()"
+            style="width:72px;padding:8px;border:0.5px solid var(--border-md);border-radius:8px;font-size:14px;text-align:center;font-family:inherit;">
+          <span style="color:var(--muted);">~</span>
+          <input type="number" id="statsVisitMax" placeholder="최대" min="0" oninput="calcStats()"
+            style="width:72px;padding:8px;border:0.5px solid var(--border-md);border-radius:8px;font-size:14px;text-align:center;font-family:inherit;">
+          <span style="font-size:12px;color:var(--muted);">회</span>
+        </div>
+      </div>
+
+      <!-- 4. 주 이용 -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">주 이용</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;cursor:pointer;">
+            <input type="checkbox" id="filterScreen" checked onchange="calcStats()" style="width:16px;height:16px;cursor:pointer;accent-color:#2563a8;"> 스크린골프
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;cursor:pointer;">
+            <input type="checkbox" id="filterPark" checked onchange="calcStats()" style="width:16px;height:16px;cursor:pointer;accent-color:#1a7a4a;"> 파크골프
+          </label>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px;">둘 다 선택 시 스크린+파크 이용자까지 포함</div>
+      </div>
+
+      <!-- 4-b. 이용 시간대 & 평일/주말 -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">이용 패턴</div>
+
+        <!-- 시간대 -->
+        <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;">주 이용 시간대 <span style="font-weight:500;">(가장 많이 방문하는 시간대 기준)</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:700;cursor:pointer;">
+            <input type="checkbox" id="timeAll" checked onchange="onTimeAllChange()" style="width:16px;height:16px;cursor:pointer;"> 전체
+          </label>
+          <div style="width:1px;height:16px;background:var(--border);"></div>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" class="timeChk" value="09~12" checked onchange="onTimeChkChange()" style="width:15px;height:15px;cursor:pointer;"> <span style="font-size:12px;font-weight:700;background:#dbeafe;color:#2563a8;padding:2px 8px;border-radius:8px;">09~12시</span></label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" class="timeChk" value="12~15" checked onchange="onTimeChkChange()" style="width:15px;height:15px;cursor:pointer;"> <span style="font-size:12px;font-weight:700;background:#dcfce7;color:#1a7a4a;padding:2px 8px;border-radius:8px;">12~15시</span></label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" class="timeChk" value="15~18" checked onchange="onTimeChkChange()" style="width:15px;height:15px;cursor:pointer;"> <span style="font-size:12px;font-weight:700;background:#fff3e0;color:#e67e22;padding:2px 8px;border-radius:8px;">15~18시</span></label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" class="timeChk" value="18~22" checked onchange="onTimeChkChange()" style="width:15px;height:15px;cursor:pointer;"> <span style="font-size:12px;font-weight:700;background:#ede9fe;color:#7b5ea7;padding:2px 8px;border-radius:8px;">18~22시</span></label>
+        </div>
+
+        <!-- 평일/주말 -->
+        <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;">주 방문 요일 <span style="font-weight:500;">(평일/주말 방문 비율 기준)</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:700;cursor:pointer;">
+            <input type="checkbox" id="dayTypeAll" checked onchange="onDayTypeAllChange()" style="width:16px;height:16px;cursor:pointer;"> 전체
+          </label>
+          <div style="width:1px;height:16px;background:var(--border);"></div>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" class="dayTypeChk" value="weekday" checked onchange="onDayTypeChkChange()" style="width:15px;height:15px;cursor:pointer;">
+            <span style="font-size:12px;font-weight:700;background:#f0f0eb;color:#555;padding:2px 8px;border-radius:8px;">평일 선호</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" class="dayTypeChk" value="weekend" checked onchange="onDayTypeChkChange()" style="width:15px;height:15px;cursor:pointer;">
+            <span style="font-size:12px;font-weight:700;background:#ffe0e0;color:#c0392b;padding:2px 8px;border-radius:8px;">주말·공휴일 선호</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 5. 등급 -->
+      <div style="margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;">등급</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:700;cursor:pointer;">
+            <input type="checkbox" id="gradeAll" checked onchange="onGradeAllChange()" style="width:16px;height:16px;cursor:pointer;"> 전체
+          </label>
+          <div style="width:1px;height:16px;background:var(--border);"></div>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" class="gradeChk" value="출자회원" checked onchange="onGradeChkChange()" style="width:15px;height:15px;cursor:pointer;accent-color:#1a7a4a;"> <span class="badge badge-green">출자회원</span></label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" class="gradeChk" value="동호회원" checked onchange="onGradeChkChange()" style="width:15px;height:15px;cursor:pointer;accent-color:#2563a8;"> <span class="badge badge-blue">동호회원</span></label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" class="gradeChk" value="일반" checked onchange="onGradeChkChange()" style="width:15px;height:15px;cursor:pointer;"> <span class="badge badge-gray">일반</span></label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" class="gradeChk" value="타지역" checked onchange="onGradeChkChange()" style="width:15px;height:15px;cursor:pointer;accent-color:#e67e22;"> <span class="badge badge-orange">타지역</span></label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" class="gradeChk" value="비회원" checked onchange="onGradeChkChange()" style="width:15px;height:15px;cursor:pointer;"> <span class="badge badge-gray">비회원</span></label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" class="gradeChk" value="파크골프" checked onchange="onGradeChkChange()" style="width:15px;height:15px;cursor:pointer;accent-color:#16a085;"> <span class="badge" style="background:#d1f5ee;color:#16a085;">파크골프</span></label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" class="gradeChk" value="__unknown__" checked onchange="onGradeChkChange()" style="width:15px;height:15px;cursor:pointer;accent-color:#aaa;"> <span class="badge badge-gray">미등록</span></label>
+        </div>
+      </div>
+
+      <button class="btn primary" onclick="calcStats()" style="width:100%;padding:11px;">조회</button>
+    </div>
   </div>
+
+  <!-- 지표 -->
   <div class="stat-cards">
     <div class="stat-card"><div class="stat-num" id="sTot">-</div><div class="stat-label">총 게임 수</div></div>
     <div class="stat-card"><div class="stat-num" id="sUniq">-</div><div class="stat-label">방문 회원 수</div></div>
     <div class="stat-card"><div class="stat-num" id="sReg">-</div><div class="stat-label">단골 <span style="font-size:10px;color:var(--muted);">14일·2회↑</span></div></div>
     <div class="stat-card"><div class="stat-num" id="sTotal">-</div><div class="stat-label">전체 회원</div></div>
   </div>
+
+  <!-- 방문 순위 -->
   <div class="card">
-    <div style="font-size:14px;font-weight:800;margin-bottom:12px;">🏆 방문 순위</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:800;">🏆 방문 순위</div>
+      <div id="statsResultCount" style="font-size:12px;color:var(--muted);font-weight:700;"></div>
+    </div>
     <table class="rank-table">
-      <thead><tr><th style="width:36px;">순위</th><th>이름</th><th>방문 횟수</th><th>주 이용</th><th>등급</th></tr></thead>
+      <thead><tr><th style="width:36px;">순위</th><th>이름</th><th>게임 횟수</th><th>주 이용</th><th>등급</th></tr></thead>
       <tbody id="rankBody"></tbody>
     </table>
   </div>
@@ -900,6 +1053,7 @@ td.slot.dragging { opacity: 0.4; }
         <label class="grade-check-label" style="border-color:#888;"><input type="checkbox" class="fGrades" value="비회원"><span style="color:#555;">👤 비회원</span></label>
         <label class="grade-check-label" style="border-color:#1a7a4a;"><input type="checkbox" class="fGrades" value="동호회원"><span style="color:#1a7a4a;">⛳ 동호회원</span></label>
         <label class="grade-check-label" style="border-color:#aaa;"><input type="checkbox" class="fGrades" value="일반"><span style="color:#777;">🙂 일반</span></label>
+        <label class="grade-check-label" style="border-color:#16a085;"><input type="checkbox" class="fGrades" value="파크골프"><span style="color:#16a085;">🌿 파크골프</span></label>
       </div>
     </div>
     <!-- 일행 연결 -->
@@ -1587,6 +1741,17 @@ function attachSlotEvents(td,type,bayIdx,time,bayName){
     if(found) startDrag(e,type,found.key,found.b,td);
     else startSelectDrag(e,type,bayIdx,time);
   });
+  td.addEventListener('dblclick',e=>{
+    e.preventDefault(); e.stopPropagation();
+    const found=getAt(type,boardState[type].date,bayIdx,time);
+    if(!found) return;
+    const b=found.b;
+    b.dimmed=!b.dimmed;
+    // Firebase에 dimmed 상태 저장
+    const fbKey=found.key.replace(/_/g,'-');
+    fbSet(`bookings/${type}/${fbKey}/dimmed`, b.dimmed===true ? true : null);
+    renderCal(type);
+  });
   td.addEventListener('click',e=>{
     if(drag&&drag.moved) return;
     if(selectDrag&&selectDrag.committed) return;
@@ -1902,7 +2067,9 @@ function refreshTable(type){
       if(found){
         const b=found.b;
         const bl=isBlacklisted(b.name);
-        const p=(b.palette&&!bl)?b.palette:nextPalette(type,b.name);
+        const dimmed=b.dimmed===true;
+        const p=dimmed?{bg:'rgba(150,150,150,0.25)',text:'#999',border:'rgba(150,150,150,0.4)'}:
+                (b.palette&&!bl)?b.palette:nextPalette(type,b.name);
         if(bl) b.palette=p;
         // 기존 border-top 보존 (정각/30분 구분선)
         const prevBorderTop=td.style.borderTop;
@@ -1931,7 +2098,7 @@ function refreshTable(type){
             : '';
           const games=parseInt(b.games||1);
           const gamesSpan=games>1?`<span style="color:#c0392b;font-weight:800;">${games}게임</span> `:'';
-          td.innerHTML=`<div class="slot-content" style="height:${totalHeight}px;background:${p.bg};border:1.5px solid ${bl?'rgba(180,0,0,0.5)':'rgba(0,0,0,0.45)'};border-radius:4px;pointer-events:none;">
+          td.innerHTML=`<div class="slot-content" style="height:${totalHeight}px;background:${p.bg};border:1.5px solid ${dimmed?p.border:bl?'rgba(180,0,0,0.5)':'rgba(0,0,0,0.45)'};border-radius:4px;pointer-events:none;${dimmed?'opacity:0.7;':''}">
             ${blLabel}
             <span class="slot-time" style="color:${p.text}">${b.start} ~ ${b.end}</span>
             ${nameLines}
@@ -2006,7 +2173,15 @@ function renderSummaryCol(type,date,bayNames){
   // 1. KPI
   const bookingCount=bookings.length;
   const peopleTotal=bookings.reduce((s,b)=>s+(parseInt(b.people)||0),0);
-  const gamesTotal=bookings.reduce((s,b)=>s+(parseInt(b.people)||1)*(parseInt(b.games)||1),0);
+  // 총 게임 수 = 회원별 게임 카운트의 합
+  // (예: 이름 "A B" 2게임 → A:2 + B:2 = 4)
+  // 이름이 비어있으면 인원수 사용 (fallback)
+  const gamesTotal=bookings.reduce((s,b)=>{
+    const names=(b.name||'').trim().split(/\s+/).filter(Boolean);
+    const peopleCount=names.length>0?names.length:(parseInt(b.people)||1);
+    const games=parseInt(b.games)||1;
+    return s+peopleCount*games;
+  },0);
   // 가동률 = 예약된 슬롯 / 전체 슬롯 (방수 × 78슬롯[9:00~22:00, 10분 단위])
   const totalSlots=bayNames.length*78;
   const usedSlots=bookings.reduce((s,b)=>s+(si(b.end)-si(b.start)),0);
@@ -2091,12 +2266,14 @@ function renderSummaryCol(type,date,bayNames){
       </div>`;
   }
 
-  // 4. 홀 단위 집계 (인원 × 게임 수 기준)
+  // 4. 홀 단위 집계 (회원별 카운트 합산 = 이름 개수 × 게임 수)
   const holeCounts={};
   bookings.forEach(b=>{
     const h=b.hole||'미지정';
-    const gameCount=(parseInt(b.people)||1)*(parseInt(b.games)||1);
-    holeCounts[h]=(holeCounts[h]||0)+gameCount;
+    const names=(b.name||'').trim().split(/\s+/).filter(Boolean);
+    const peopleCount=names.length>0?names.length:(parseInt(b.people)||1);
+    const games=parseInt(b.games)||1;
+    holeCounts[h]=(holeCounts[h]||0)+peopleCount*games;
   });
   const holeEl=document.getElementById(prefix+'Holes');
   if(!Object.keys(holeCounts).length){
@@ -2503,22 +2680,53 @@ function analysisBoxHTML(name){
 }
 
 function getMemberVisits(name){
+  if(!name) return 0;
   let cnt=0;
-  ['screen','park'].forEach(type=>{ Object.values(bookingsDB[type]).forEach(b=>{if(b.name===name)cnt++;}); });
+  ['screen','park'].forEach(type=>{
+    Object.values(bookingsDB[type]).forEach(b=>{
+      const names=(b.name||'').trim().split(/\s+/).filter(Boolean);
+      if(names.includes(name)) cnt+=parseInt(b.games||1); // 게임 수만큼 카운트
+    });
+  });
   return cnt;
 }
 function getLastVisit(name){
+  if(!name) return '';
   let last='';
-  ['screen','park'].forEach(type=>{ Object.values(bookingsDB[type]).forEach(b=>{if(b.name===name&&b.date>last)last=b.date;}); });
+  ['screen','park'].forEach(type=>{
+    Object.values(bookingsDB[type]).forEach(b=>{
+      const names=(b.name||'').trim().split(/\s+/).filter(Boolean);
+      if(names.includes(name) && b.date>last) last=b.date;
+    });
+  });
   return last;
 }
 
+function matchWildcard(pattern, str){
+  if(!pattern||!str) return false;
+  // * 를 정규식 .* 로 변환 (와일드카드 검색)
+  const escaped=pattern.replace(/[.+?^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.*');
+  try { return new RegExp(escaped,'i').test(str); } catch(e){ return str.includes(pattern); }
+}
+
 function filterMembers(){
-  const q=document.getElementById('searchInput').value.toLowerCase();
+  const q=document.getElementById('searchInput').value.toLowerCase().trim();
   const gr=document.getElementById('gradeFilter').value;
   const so=document.getElementById('sortFilter').value;
+  const hasWildcard=q.includes('*');
   let list=Object.values(membersDB).filter(m=>{
-    const matchQ=!q||(m.name&&m.name.includes(q))||(m.phone&&m.phone.includes(q));
+    let matchQ=true;
+    if(q){
+      if(hasWildcard){
+        // 와일드카드 모드: 이름, 전화번호, 차량번호 모두 대상
+        matchQ=matchWildcard(q,m.name||'')||matchWildcard(q,m.phone||'')||matchWildcard(q,m.car||'');
+      } else {
+        // 일반 검색: 이름, 전화번호, 차량번호 포함 검색
+        matchQ=(m.name&&m.name.toLowerCase().includes(q))||
+               (m.phone&&m.phone.includes(q))||
+               (m.car&&m.car.toLowerCase().includes(q));
+      }
+    }
     const grades=Array.isArray(m.grades)?m.grades:(m.grade?[m.grade]:[]);
     const matchGr=!gr||(gr==='__blacklist__'?m.blacklist===true:grades.includes(gr));
     return matchQ&&matchGr;
@@ -2618,9 +2826,36 @@ function openEditMemberModal(id){
   if(m.memos&&m.memos.length){
     mw.style.display='block';
     document.getElementById('memoList').innerHTML=[...m.memos].reverse()
-      .map(memo=>`<div class="memo-item"><div class="memo-date">${memo.date}</div><div class="memo-text">${memo.text}</div></div>`).join('');
+      .map((memo,i)=>{
+        const origIdx=m.memos.length-1-i; // reverse 전 원래 인덱스
+        return `<div class="memo-item" style="display:flex;align-items:flex-start;gap:6px;">
+          <div style="flex:1;"><div class="memo-date">${memo.date}</div><div class="memo-text">${memo.text}</div></div>
+          <button onclick="deleteMemo('${m.id}',${origIdx})" style="flex-shrink:0;background:none;border:none;color:#c0392b;font-size:16px;cursor:pointer;padding:0 2px;line-height:1;" title="메모 삭제">🗑</button>
+        </div>`;
+      }).join('');
   } else mw.style.display='none';
   document.getElementById('memberModalBg').classList.add('open');
+}
+function deleteMemo(memberId, memoIdx){
+  if(!confirm('이 메모를 삭제하시겠습니까?')) return;
+  const m=membersDB[memberId];
+  if(!m||!m.memos) return;
+  m.memos.splice(memoIdx,1);
+  fbSet(`members/${memberId}/memos`, m.memos.length ? m.memos : null);
+  // 메모 목록 갱신
+  const mw=document.getElementById('memoWrap');
+  if(m.memos.length){
+    document.getElementById('memoList').innerHTML=[...m.memos].reverse()
+      .map((memo,i)=>{
+        const origIdx=m.memos.length-1-i;
+        return `<div class="memo-item" style="display:flex;align-items:flex-start;gap:6px;">
+          <div style="flex:1;"><div class="memo-date">${memo.date}</div><div class="memo-text">${memo.text}</div></div>
+          <button onclick="deleteMemo('${memberId}',${origIdx})" style="flex-shrink:0;background:none;border:none;color:#c0392b;font-size:16px;cursor:pointer;padding:0 2px;line-height:1;" title="메모 삭제">🗑</button>
+        </div>`;
+      }).join('');
+  } else {
+    if(mw) mw.style.display='none';
+  }
 }
 function closeMemberModal(){document.getElementById('memberModalBg').classList.remove('open');}
 
@@ -2757,83 +2992,208 @@ document.getElementById('memberModalBg').addEventListener('click',e=>{if(e.targe
 
 // ══ 방문 통계 ══
 function setQuick(days){
-  const to=new Date(),from=new Date(); from.setDate(from.getDate()-days);
+  const to=new Date(),from=new Date(); from.setDate(from.getDate()-days+1);
   document.getElementById('dateFrom').value=toDateStr(from);
   document.getElementById('dateTo').value=toDateStr(to);
   calcStats();
 }
+
+function toggleStatsFilter(){
+  const body=document.getElementById('statsFilterBody');
+  const btn=document.getElementById('statsFilterToggleBtn');
+  const open=body.style.display!=='none';
+  body.style.display=open?'none':'block';
+  btn.textContent=open?'펼치기 ▶':'접기 ▼';
+}
+
+function onDayTypeAllChange(){
+  const all=document.getElementById('dayTypeAll').checked;
+  document.querySelectorAll('.dayTypeChk').forEach(c=>{c.checked=all;});
+  calcStats();
+}
+function onDayTypeChkChange(){
+  const chks=Array.from(document.querySelectorAll('.dayTypeChk'));
+  document.getElementById('dayTypeAll').checked=chks.every(c=>c.checked);
+  calcStats();
+}
+
+function onTimeAllChange(){
+  const all=document.getElementById('timeAll').checked;
+  document.querySelectorAll('.timeChk').forEach(c=>{c.checked=all;});
+  calcStats();
+}
+function onTimeChkChange(){
+  const chks=Array.from(document.querySelectorAll('.timeChk'));
+  document.getElementById('timeAll').checked=chks.every(c=>c.checked);
+  calcStats();
+}
+
+function onGradeAllChange(){
+  const all=document.getElementById('gradeAll').checked;
+  document.querySelectorAll('.gradeChk').forEach(c=>{c.checked=all;});
+  calcStats();
+}
+function onGradeChkChange(){
+  const chks=Array.from(document.querySelectorAll('.gradeChk'));
+  document.getElementById('gradeAll').checked=chks.every(c=>c.checked);
+  calcStats();
+}
+
 function calcStats(){
   const from=document.getElementById('dateFrom').value;
   const to=document.getElementById('dateTo').value;
   if(!from||!to) return;
 
-  // 기간 내 예약 집계 — 이름을 띄어쓰기로 분리해 개인별 집계
-  const nameVisits={};  // {name: {visits, games, types, dates[]}}
+  // ── 필터값 읽기 ──
+  const nameQ=(document.getElementById('statsNameFilter')?.value||'').trim().toLowerCase();
+  const visitMin=parseInt(document.getElementById('statsVisitMin')?.value)||0;
+  const visitMaxVal=document.getElementById('statsVisitMax')?.value;
+  const visitMax=visitMaxVal?parseInt(visitMaxVal):Infinity;
+  const fScreen=document.getElementById('filterScreen')?.checked!==false;
+  const fPark=document.getElementById('filterPark')?.checked!==false;
+  const gradeAllEl=document.getElementById('gradeAll');
+  const gradeAll=!gradeAllEl||gradeAllEl.checked;
+  const selectedGrades=Array.from(document.querySelectorAll('.gradeChk')).filter(c=>c.checked).map(c=>c.value);
+
+  // ── 기간 내 예약 집계 ──
+  // visits: 게임 수 합산 (1예약 1게임 = 1, 1예약 2게임 = 2)
+  // games: 동일 (별칭)
+  const nameVisits={};
   ['screen','park'].forEach(type=>{
     Object.values(bookingsDB[type]).forEach(b=>{
       if(b.date>=from&&b.date<=to){
-        const games=parseInt(b.games||1);
-        const people=parseInt(b.people||1);
-        // 이름을 띄어쓰기로 분리 (홍길동 김철수 → 각각 1건씩)
+        const games=parseInt(b.games)||1;
         const names=(b.name||'').trim().split(/\s+/).filter(Boolean);
-        // 게임 수는 전체 예약 기준이므로 개인당 1/names.length로 나누지 않고 동일하게 기록
-        // (방문 횟수는 예약 1건 = 각 이름 1회 방문)
+        // 시간대 분류
+        const h=parseInt((b.start||'09:00').split(':')[0]);
+        const tBucket=h<12?'09~12':h<15?'12~15':h<18?'15~18':'18~22';
+        // 평일/주말 분류
+        const dow=new Date(b.date).getDay();
+        const hMap=getHolidayMap(new Date(b.date).getFullYear());
+        const isWeekend=(dow===0||dow===6||!!hMap[b.date]);
         names.forEach(name=>{
-          if(!nameVisits[name]) nameVisits[name]={visits:0,games:0,types:{screen:0,park:0},dates:[]};
-          nameVisits[name].visits++;
-          nameVisits[name].games+=games; // 게임 수는 동일하게 기록
+          if(!nameVisits[name]) nameVisits[name]={visits:0,games:0,types:{screen:0,park:0},dates:[],times:{'09~12':0,'12~15':0,'15~18':0,'18~22':0},weekday:0,weekend:0};
+          nameVisits[name].visits+=games; // 게임 수만큼 카운트 (getMemberVisits와 일치)
+          nameVisits[name].games+=games;
           nameVisits[name].types[type]++;
           nameVisits[name].dates.push(b.date);
+          nameVisits[name].times[tBucket]++;
+          if(isWeekend) nameVisits[name].weekend++;
+          else nameVisits[name].weekday++;
         });
       }
     });
   });
 
-  const allMembers=Object.values(membersDB);
-  const visitList=Object.entries(nameVisits).sort((a,b)=>b[1].visits-a[1].visits);
-
-  // 총 게임 수 — 예약 건별로 (인원 × 게임 수) 합산 (이름 분리와 무관하게 예약 단위로 계산)
+  // ── 전체 통계 (필터 전) ──
+  // 총 게임 수 = 회원별 카운트 합 = 이름 개수 × 게임 수
   let totGames=0;
   ['screen','park'].forEach(type=>{
     Object.values(bookingsDB[type]).forEach(b=>{
       if(b.date>=from&&b.date<=to){
-        totGames+=parseInt(b.games||1)*parseInt(b.people||1);
+        const names=(b.name||'').trim().split(/\s+/).filter(Boolean);
+        const peopleCount=names.length>0?names.length:(parseInt(b.people)||1);
+        const games=parseInt(b.games)||1;
+        totGames+=peopleCount*games;
       }
     });
   });
-  // 방문 회원 수
-  const uniq=visitList.length;
-  // 단골 — 14일 내 2회 이상 방문한 회원 수
   const today14=toDateStr(new Date());
   const d14=new Date(); d14.setDate(d14.getDate()-14);
   const date14=toDateStr(d14);
-  const regularCount=Object.values(nameVisits).filter(v=>{
-    const recentDates=v.dates.filter(d=>d>=date14&&d<=today14);
-    return recentDates.length>=2;
-  }).length;
-  // 전체 회원 수
-  const totalMembers=allMembers.length;
-
+  const regularCount=Object.values(nameVisits).filter(v=>
+    v.dates.filter(d=>d>=date14&&d<=today14).length>=2
+  ).length;
   document.getElementById('sTot').textContent=totGames;
-  document.getElementById('sUniq').textContent=uniq;
+  document.getElementById('sUniq').textContent=Object.keys(nameVisits).length;
   document.getElementById('sReg').textContent=regularCount;
-  document.getElementById('sTotal').textContent=totalMembers;
+  document.getElementById('sTotal').textContent=Object.values(membersDB).length;
 
-  const max=visitList[0]?.[1].visits||1;
+  // ── 필터 적용 ──
+  let filtered=Object.entries(nameVisits);
+
+  // 1. 이름
+  if(nameQ) filtered=filtered.filter(([name])=>name.toLowerCase().includes(nameQ));
+
+  // 2. 방문 횟수
+  filtered=filtered.filter(([,v])=>v.visits>=visitMin&&v.visits<=visitMax);
+
+  // 3. 주 이용 — 스크린만/파크만/둘다 선택에 따라
+  filtered=filtered.filter(([,v])=>{
+    const hasS=v.types.screen>0, hasP=v.types.park>0;
+    if(fScreen&&fPark) return hasS||hasP;   // 둘 다 체크: 스크린+파크 모두 포함
+    if(fScreen&&!fPark) return hasS;         // 스크린만: 스크린 이용자 (파크 병행도 포함)
+    if(!fScreen&&fPark) return hasP;         // 파크만: 파크 이용자 (스크린 병행도 포함)
+    return false; // 둘 다 해제
+  });
+
+  // 4. 등급
+  if(!gradeAll&&selectedGrades.length){
+    filtered=filtered.filter(([name])=>{
+      const m=Object.values(membersDB).find(x=>x.name===name);
+      const grades=m?(Array.isArray(m.grades)?m.grades:(m.grade?[m.grade]:[])):[]; 
+      if(grades.length===0) return selectedGrades.includes('__unknown__');
+      return grades.some(g=>selectedGrades.includes(g));
+    });
+  }
+
+  // 5. 주 이용 시간대 — 가장 많이 방문한 시간대가 선택된 것 중 하나인 사람
+  const timeAllEl=document.getElementById('timeAll');
+  const timeAll=!timeAllEl||timeAllEl.checked;
+  if(!timeAll){
+    const selectedTimes=Array.from(document.querySelectorAll('.timeChk')).filter(c=>c.checked).map(c=>c.value);
+    if(selectedTimes.length){
+      filtered=filtered.filter(([,v])=>{
+        // 가장 많이 방문한 시간대 찾기
+        const topTime=Object.entries(v.times||{}).sort((a,b)=>b[1]-a[1])[0]?.[0];
+        return selectedTimes.includes(topTime);
+      });
+    }
+  }
+
+  // 6. 주 방문 요일 — 평일/주말 중 더 많이 방문한 쪽
+  const dayTypeAllEl=document.getElementById('dayTypeAll');
+  const dayTypeAll=!dayTypeAllEl||dayTypeAllEl.checked;
+  if(!dayTypeAll){
+    const selectedDayTypes=Array.from(document.querySelectorAll('.dayTypeChk')).filter(c=>c.checked).map(c=>c.value);
+    if(selectedDayTypes.length){
+      filtered=filtered.filter(([,v])=>{
+        const prefersWeekend=(v.weekend||0)>=(v.weekday||0);
+        const preferred=prefersWeekend?'weekend':'weekday';
+        return selectedDayTypes.includes(preferred);
+      });
+    }
+  }
+
+  // ── 순위 렌더 ──
+  filtered.sort((a,b)=>b[1].visits-a[1].visits);
+  const max=filtered[0]?.[1].visits||1;
   const rc=['r1','r2','r3'];
-  document.getElementById('rankBody').innerHTML=visitList.map(([name,v],i)=>{
-    const m=Object.values(membersDB).find(x=>x.name===name);
-    const grade=m?m.grade:'일반';
-    const isG=v.types.park>=v.types.screen;
-    const tag=v.types.screen>0&&v.types.park>0?'<span class="badge b-both">스크린+파크</span>':v.types.screen>0?'<span class="badge b-screen">스크린</span>':'<span class="badge b-park">파크</span>';
-    return `<tr>
-      <td class="rn ${rc[i]||''}">${i+1}</td>
-      <td style="font-weight:800;">${name}</td>
-      <td><div style="font-weight:800;">${v.visits}회</div><div class="bbar-wrap"><div class="bbar-fill${isG?' g':''}" style="width:${Math.round(v.visits/max*100)}%"></div></div></td>
-      <td>${tag}</td>
-      <td><span class="badge ${gc(grade)}">${grade}</span></td>
-    </tr>`;
-  }).join('');
+  const countEl=document.getElementById('statsResultCount');
+  if(countEl) countEl.textContent=`${filtered.length}명`;
+
+  document.getElementById('rankBody').innerHTML=filtered.length===0
+    ?`<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted);">조건에 맞는 방문자가 없습니다</td></tr>`
+    :filtered.map(([name,v],i)=>{
+      const m=Object.values(membersDB).find(x=>x.name===name);
+      const grades=m?(Array.isArray(m.grades)?m.grades:(m.grade?[m.grade]:[])):[];
+      const gradeHtml=grades.length
+        ?grades.map(g=>`<span class="badge ${gc(g)}">${g}</span>`).join(' ')
+        :'<span class="badge badge-gray">미등록</span>';
+      const isG=v.types.park>=v.types.screen;
+      const tag=v.types.screen>0&&v.types.park>0
+        ?'<span class="badge b-both">스크린+파크</span>'
+        :v.types.screen>0?'<span class="badge b-screen">스크린</span>'
+        :'<span class="badge b-park">파크</span>';
+      return `<tr>
+        <td class="rn ${rc[i]||''}">${i+1}</td>
+        <td style="font-weight:800;">${name}</td>
+        <td><div style="font-weight:800;">${v.visits}게임</div>
+          <div class="bbar-wrap"><div class="bbar-fill${isG?' g':''}" style="width:${Math.round(v.visits/max*100)}%"></div></div></td>
+        <td>${tag}</td>
+        <td>${gradeHtml}</td>
+      </tr>`;
+    }).join('');
 }
 
 // ══ 탭 전환 ══
@@ -3495,8 +3855,10 @@ function renderBigCalendar(){
         b.className='shift-badge';
         const col=getStaffColor(staff);
         b.style.cssText=`background:${col};background-color:${col};color:#fff;`;
-        b.textContent=staff;
-        b.title=staff;
+        // 모바일(640px 이하)에서만 뒤 2글자, PC는 전체 이름
+        const isMobile=window.innerWidth<=640;
+        b.textContent=isMobile&&staff.length>2?staff.slice(-2):staff;
+        b.title=staff; // 전체 이름은 툴팁으로
         if(workEditMode){
           b.classList.add('removable');
           b.onclick=(e)=>{
