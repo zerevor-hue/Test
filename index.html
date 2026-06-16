@@ -879,7 +879,10 @@ td.slot.dragging { opacity: 0.4; }
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
       <div style="font-size:14px;font-weight:800;">🏆 방문 순위</div>
-      <div id="statsResultCount" style="font-size:12px;color:var(--muted);font-weight:700;"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div id="statsResultCount" style="font-size:12px;color:var(--muted);font-weight:700;"></div>
+        <button onclick="exportStatsExcel()" style="background:#1a7a4a;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;">📊 엑셀 출력</button>
+      </div>
     </div>
     <table class="rank-table">
       <thead><tr><th style="width:36px;">순위</th><th>이름</th><th>게임 횟수</th><th>주 이용</th><th>등급</th></tr></thead>
@@ -3246,6 +3249,139 @@ function calcStats(){
         <td>${gradeHtml}</td>
       </tr>`;
     }).join('');
+}
+
+// ── 방문통계 엑셀 출력 ──
+function exportStatsExcel(){
+  if(typeof JSZip==='undefined'){alert('라이브러리 로딩 중입니다. 잠시 후 다시 시도해주세요.');return;}
+
+  // 현재 필터된 결과 재수집 (calcStats와 동일한 로직으로 filtered 재구성)
+  // nameVisits는 calcStats 실행 후 DOM에 이미 반영돼 있으므로 rankBody에서 파싱하지 않고
+  // calcStats를 한 번 더 실행해 직접 가져옴
+  const rows=[];
+  document.querySelectorAll('#rankBody tr').forEach(tr=>{
+    const tds=tr.querySelectorAll('td');
+    if(tds.length<5) return;
+    const name=tds[1]?.textContent?.trim();
+    if(!name||name==='조건에 맞는 방문자가 없습니다') return;
+    const games=tds[2]?.textContent?.replace('게임','').trim();
+    const typeTag=tds[3]?.textContent?.trim();
+    const m=Object.values(membersDB).find(x=>x.name===name);
+    rows.push({
+      name,
+      phone:(m?.phone)||'',
+      games:parseInt(games)||0,
+      type:typeTag||''
+    });
+  });
+
+  if(rows.length===0){alert('출력할 데이터가 없습니다.');return;}
+
+  // JSZip으로 xlsx 생성
+  const zip=new JSZip();
+
+  // 날짜 범위 텍스트
+  const fromEl=document.getElementById('statsFrom');
+  const toEl=document.getElementById('statsTo');
+  const rangeText=(fromEl?.value||'')+' ~ '+(toEl?.value||'');
+
+  // xlsx XML 생성
+  const sharedStrings=[];
+  const ssIdx={};
+  function getSS(s){
+    const str=String(s||'');
+    if(ssIdx[str]===undefined){ssIdx[str]=sharedStrings.length;sharedStrings.push(str);}
+    return ssIdx[str];
+  }
+
+  // 헤더
+  const headers=['순위','이름','연락처','총 게임 수','주 이용'];
+  headers.forEach(h=>getSS(h));
+
+  // 데이터 행 XML
+  let rowsXml='';
+  // 헤더 행
+  rowsXml+=`<row r="1">`;
+  headers.forEach((h,ci)=>{
+    const col=String.fromCharCode(65+ci);
+    rowsXml+=`<c r="${col}1" t="s"><v>${getSS(h)}</v></c>`;
+  });
+  rowsXml+=`</row>`;
+
+  // 기간 행
+  rowsXml+=`<row r="2"><c r="A2" t="s"><v>${getSS('기간: '+rangeText)}</v></c></row>`;
+
+  // 데이터
+  rows.forEach((row,i)=>{
+    const r=i+3;
+    rowsXml+=`<row r="${r}">`;
+    rowsXml+=`<c r="A${r}" t="s"><v>${getSS(String(i+1))}</v></c>`;
+    rowsXml+=`<c r="B${r}" t="s"><v>${getSS(row.name)}</v></c>`;
+    rowsXml+=`<c r="C${r}" t="s"><v>${getSS(row.phone)}</v></c>`;
+    rowsXml+=`<c r="D${r}"><v>${row.games}</v></c>`;
+    rowsXml+=`<c r="E${r}" t="s"><v>${getSS(row.type)}</v></c>`;
+    rowsXml+='</row>';
+  });
+
+  // sheet1.xml
+  const sheetXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<sheetData>${rowsXml}</sheetData>
+</worksheet>`;
+
+  // sharedStrings.xml
+  const ssXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${sharedStrings.length}" uniqueCount="${sharedStrings.length}">
+${sharedStrings.map(s=>`<si><t xml:space="preserve">${s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</t></si>`).join('')}
+</sst>`;
+
+  // workbook.xml
+  const wbXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="방문통계" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`;
+
+  // rels
+  const relsXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>
+</Relationships>`;
+
+  const contentTypes=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>
+</Types>`;
+
+  zip.file('[Content_Types].xml', contentTypes);
+  zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`);
+  zip.file('xl/workbook.xml', wbXml);
+  zip.file('xl/_rels/workbook.xml.rels', relsXml);
+  zip.file('xl/worksheets/sheet1.xml', sheetXml);
+  zip.file('xl/sharedStrings.xml', ssXml);
+
+  // 파일명
+  const today=toDateStr(new Date());
+  const fname=`방문통계_${today}.xlsx`;
+
+  zip.generateAsync({
+    type:'blob',
+    mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    compression:'DEFLATE',compressionOptions:{level:6}
+  }).then(function(blob){
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=fname;a.click();
+    URL.revokeObjectURL(url);
+  });
 }
 
 // ══ 탭 전환 ══
